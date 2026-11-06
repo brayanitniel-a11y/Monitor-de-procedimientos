@@ -226,8 +226,9 @@ class Portal:
             self._elegir_dropdown("contratacion", re.compile(rf"^\s*{re.escape(tipo)}\s*$", re.I))
             self._elegir_claves(claves)
             ini, fin = self.page.locator("input[name='fechaDesdeP']"), self.page.locator("input[name='fechaHastaP']")
-            self._escribir(ini.first, desde.strftime("%d/%m/%Y"))
-            self._escribir(fin.first, hasta.strftime("%d/%m/%Y"))
+            self._escribir_fecha(ini.first, desde)
+            self._escribir_fecha(fin.first, hasta)
+            log.info("Fechas en pantalla: desde=%r hasta=%r", ini.first.input_value(), fin.first.input_value())
             self._captura(f"filtros_llenos_{i}")
             self._pulsar_buscar()
             self.page.wait_for_load_state("networkidle")
@@ -244,6 +245,18 @@ class Portal:
                     break
         log.info("Procedimientos encontrados %s→%s: %s", desde, hasta, len(resultados))
         return list(resultados.values())
+
+    def _escribir_fecha(self, loc, d: date) -> None:
+        """Calendario de PrimeNG: se escribe como una persona (tecla por tecla) y se confirma con Enter."""
+        loc.click()
+        loc.press("Control+A")
+        loc.press("Backspace")
+        loc.press_sequentially(d.strftime("%d/%m/%Y"), delay=60)
+        loc.press("Enter")
+        time.sleep(0.5)
+        self.page.keyboard.press("Escape")
+        self.page.mouse.click(5, 5)
+        time.sleep(0.4)
 
     def _pulsar_buscar(self) -> None:
         p = self.page
@@ -269,7 +282,9 @@ class Portal:
             time.sleep(3)
             log.info("DETALLE url antes=%s despues=%s", antes, p.url)
             self._captura("detalle_explorado")
-            log.info("DETALLE texto:\n%s", p.inner_text("body")[:3500])
+            texto = p.inner_text("body")
+            log.info("DETALLE texto (resto):\n%s", texto[3500:7500])
+            log.info("DETALLE botones/pestañas: %s", p.evaluate("() => Array.from(document.querySelectorAll('button, a, [role=tab], .p-tabview-nav li')).map(e => (e.innerText||'').trim()).filter(Boolean).slice(0, 60)"))
             log.info("DETALLE tablas: %s", json.dumps(p.evaluate(JS_TABLAS), ensure_ascii=False)[:2500])
             p.go_back()
             time.sleep(2)
