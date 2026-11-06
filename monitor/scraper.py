@@ -370,11 +370,15 @@ class Portal:
         self._filas().nth(k).locator("td").nth(1).click()
         p.wait_for_url(re.compile(r"/detalle/"), timeout=15000)
         p.wait_for_load_state("networkidle")
-        for texto in ("CRONOGRAMA DE EVENTOS", "Descripción detallada"):  # el detalle carga por partes
-            try:
-                p.get_by_text(texto).first.wait_for(state="visible", timeout=20000)
-            except Exception:
-                log.warning("No apareció '%s' en el detalle de %s", texto, proc.numero)
+        try:  # el detalle carga por partes: primero el cronograma, luego la tabla de renglones
+            p.get_by_text("CRONOGRAMA DE EVENTOS").first.wait_for(state="visible", timeout=20000)
+        except Exception:
+            log.warning("No apareció el cronograma en el detalle de %s", proc.numero)
+        try:
+            p.locator("th, [role=columnheader]").filter(has_text=re.compile(r"^\s*Descripción detallada\s*$")).first.wait_for(
+                state="visible", timeout=25000)
+        except Exception:
+            log.warning("No apareció la tabla de renglones en el detalle de %s", proc.numero)
         time.sleep(1.5)
         proc.url = p.url
         self._leer_detalle(proc)
@@ -387,23 +391,35 @@ class Portal:
         proc.f_junta = _fecha_cerca(texto, r"fecha y hora de junta de aclaraciones") or proc.f_junta
         proc.f_apertura = _fecha_cerca(texto, r"fecha y hora de presentaci[oó]n y apertura") or proc.f_apertura
         proc.f_fallo = _fecha_cerca(texto, r"fecha y hora del acto del fallo") or proc.f_fallo
-        partidas, codigos = [], []
-        for tabla in self.page.evaluate(JS_TABLAS):
-            hs = [_n(h) for h in tabla["headers"]]
-            if "clave" in hs and "descripcion" in hs and len(hs) == 2:  # partidas presupuestales (53101, ...)
-                codigos += [f["cells"][0] for f in tabla["rows"] if f["cells"]]
-            elif any("descripcion detallada" in h for h in hs):  # renglones del procedimiento
-                mapa = _mapear(tabla["headers"], ALIAS_PARTIDAS)
-                for fila in tabla["rows"]:
-                    c = fila["cells"]
-                    get = lambda campo: " ".join(c[mapa[campo]].split()) if campo in mapa and mapa[campo] < len(c) else ""
-                    desc = get("descripcion") or get("descripcion_cucop")
-                    if desc:
-                        partidas.append(Partida(numero=get("numero"), clave=get("clave"), descripcion=desc,
-                                                cantidad=get("cantidad")))
+        partidas, codigos, vistos = [], [], set()
+        for _pag in range(40):  # los renglones vienen paginados
+            nuevos = 0
+            for tabla in self.page.evaluate(JS_TABLAS):
+                hs = [_n(h) for h in tabla["headers"]]
+                if "clave" in hs and "descripcion" in hs and len(hs) == 2:  # partidas presupuestales (53101, ...)
+                    codigos += [f["cells"][0] for f in tabla["rows"] if f["cells"]]
+                elif any("descripcion detallada" in h for h in hs):  # renglones del procedimiento
+                    mapa = _mapear(tabla["headers"], ALIAS_PARTIDAS)
+                    for fila in tabla["rows"]:
+                        c = fila["cells"]
+                        get = lambda campo: " ".join(c[mapa[campo]].split()) if campo in mapa and mapa[campo] < len(c) else ""
+                        desc = get("descripcion") or get("descripcion_cucop")
+                        clave_fila = (get("numero"), desc)
+                        if desc and clave_fila not in vistos:
+                            vistos.add(clave_fila)
+                            nuevos += 1
+                            partidas.append(Partida(numero=get("numero"), clave=get("clave"), descripcion=desc,
+                                                    cantidad=get("cantidad")))
+            sig = self.page.locator("p-table", has=self.page.locator("th", has_text="Descripción detallada")) \
+                .locator("button.p-paginator-next:not(.p-disabled):not([disabled])")
+            if not nuevos or not sig.count() or not sig.first.is_visible():
+                break
+            sig.first.click()
+            time.sleep(1.0)
+        codigos = sorted(set(codigos))
         proc.partidas = partidas
         if codigos:
-            proc.claves_filtro = sorted(set(codigos))
+            proc.claves_filtro = codigos
         proc.detalle_ok = bool(partidas)
 
     # ---------- depuracion ----------
