@@ -174,6 +174,7 @@ class Portal:
 
     def _abrir_lista(self, nombre: str, tipo: str = "dropdown") -> None:
         sel = f"p-{tipo}[name='{nombre}']"
+        self.page.locator(sel).first.wait_for(state="visible", timeout=20000)  # algunos filtros aparecen tras elegir otros
         self.page.locator(sel).locator(f".p-{tipo}").first.click()
         time.sleep(0.8)
 
@@ -242,6 +243,7 @@ class Portal:
     def _filtrar_y_buscar(self, tipo: str, claves: list[str], desde: date, hasta: date) -> str:
         self._abrir_filtros()
         self._elegir_dropdown("ley", self.LEY)
+        self._opciones_dropdown("contratacion")  # espera a que carguen las opciones dependientes de la ley
         self._elegir_dropdown("contratacion", re.compile(rf"^\s*{re.escape(tipo)}\s*$", re.I))
         self._elegir_claves(claves)
         self._escribir_fecha(self.page.locator("input[name='fechaDesdeP']").first, desde)
