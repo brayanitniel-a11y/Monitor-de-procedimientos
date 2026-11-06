@@ -24,13 +24,14 @@ MAX_PAGINAS = 30
 
 # Encabezados de la tabla de resultados -> campo (se compara sin acentos, en minusculas)
 ALIAS_LISTA = {
-    "numero": ["numero de procedimiento", "no. de procedimiento", "numero procedimiento", "no. procedimiento", "procedimiento de contratacion"],
-    "descripcion": ["nombre del procedimiento", "descripcion", "nombre procedimiento", "objeto"],
-    "entidad": ["unidad compradora", "dependencia", "entidad", "institucion"],
-    "tipo": ["tipo de procedimiento", "tipo procedimiento"],
+    "numero": ["numero de identificacion", "numero de procedimiento", "no. de procedimiento", "numero procedimiento"],
+    "descripcion": ["nombre", "nombre del procedimiento", "descripcion", "objeto"],
+    "entidad": ["siglas dependencia o entidad", "unidad compradora", "dependencia", "entidad"],
+    "tipo": ["tipo de publicacion", "tipo de procedimiento", "caracter"],
     "estatus": ["estatus", "estado", "situacion"],
     "f_publicacion": ["fecha de publicacion", "publicacion"],
-    "f_apertura": ["fecha de apertura", "apertura de proposiciones", "presentacion y apertura"],
+    "f_junta": ["fecha junta de aclaraciones", "junta de aclaraciones"],
+    "f_apertura": ["fecha de presentacion y apertura de proposiciones", "presentacion y apertura", "fecha de apertura"],
 }
 ALIAS_PARTIDAS = {
     "numero": ["partida", "no. partida", "numero de partida", "no."],
@@ -207,7 +208,8 @@ class Portal:
                 salida.append(Procedimiento(
                     numero=numero, entidad=get("entidad"), descripcion=get("descripcion"),
                     tipo=get("tipo"), estatus=get("estatus"),
-                    f_publicacion=parse_fecha(get("f_publicacion")), f_apertura=parse_fecha(get("f_apertura")),
+                    f_publicacion=parse_fecha(get("f_publicacion")), f_junta=parse_fecha(get("f_junta")),
+                    f_apertura=parse_fecha(get("f_apertura")),
                     url=fila.get("href", ""), claves_filtro=[clave]))
         return salida
 
@@ -288,6 +290,21 @@ class Portal:
         ruta = self.debug_dir / "campos.json"
         ruta.write_text(json.dumps(info, ensure_ascii=False, indent=1), encoding="utf-8")
         (self.debug_dir / "inicio.html").write_text(p.content(), encoding="utf-8")
+        try:
+            p.get_by_text(re.compile(r"^\s*Filtros\s*$")).first.click(timeout=5000)
+            time.sleep(2)
+            self._captura("filtros_abiertos")
+            info2 = p.evaluate("""() => ({
+              inputs: Array.from(document.querySelectorAll('input, select, textarea, mat-select, [role=combobox], [role=listbox]')).map(e => ({
+                tag: e.tagName, type: e.type || '', id: e.id, name: e.name || e.getAttribute('formcontrolname') || '',
+                placeholder: e.placeholder || '', aria: e.getAttribute('aria-label'),
+                visible: !!(e.offsetWidth || e.offsetHeight)})),
+              etiquetas: Array.from(document.querySelectorAll('label, mat-label, span.label, legend')).map(e => e.innerText.trim()).filter(Boolean),
+              texto: (document.body.innerText || '').slice(0, 2500),
+            })""")
+            (self.debug_dir / "campos_filtros.json").write_text(json.dumps(info2, ensure_ascii=False, indent=1), encoding="utf-8")
+        except Exception as e:
+            (self.debug_dir / "campos_filtros.json").write_text(json.dumps({"error": str(e)}), encoding="utf-8")
         return ruta
 
 
