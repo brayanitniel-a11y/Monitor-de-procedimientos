@@ -282,6 +282,8 @@ class Portal:
             aria: e.getAttribute('aria-label'), visible: !!(e.offsetWidth || e.offsetHeight)})),
           etiquetas: Array.from(document.querySelectorAll('label, mat-label')).map(e => e.innerText.trim()).filter(Boolean),
           botones: Array.from(document.querySelectorAll('button, [role=button], a')).map(e => (e.innerText || '').trim()).filter(Boolean).slice(0, 80),
+          enlaces: Array.from(document.querySelectorAll('a[href]')).map(e => ({t: (e.innerText || '').trim().slice(0, 60), h: e.getAttribute('href')})).slice(0, 80),
+          texto: (document.body.innerText || '').slice(0, 3000),
         })""")
         ruta = self.debug_dir / "campos.json"
         ruta.write_text(json.dumps(info, ensure_ascii=False, indent=1), encoding="utf-8")

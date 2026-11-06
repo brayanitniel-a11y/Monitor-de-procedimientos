@@ -39,7 +39,9 @@ jobs:
 
       - name: 4. Descubrir campos del portal
         continue-on-error: true
-        run: python -m monitor.main --descubrir
+        run: |
+          python -m monitor.main --descubrir
+          echo "=== CAMPOS.JSON ==="; cat data/descubrir/campos.json
 
       - name: 5. Búsqueda real en seco (ayer y hoy, sin enviar ni guardar)
         continue-on-error: true
