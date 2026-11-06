@@ -41,10 +41,12 @@ jobs:
         continue-on-error: true
         run: |
           python -m monitor.main --descubrir
-          echo "=== DESPLEGABLES ==="; cat data/descubrir/desplegables.json
+          echo "(descubrimiento guardado en artefactos)"
 
       - name: 5. Búsqueda real en seco (ayer y hoy, sin enviar ni guardar)
         continue-on-error: true
+        env:
+          EXPLORAR: "1"
         run: |
           AYER=$(date -d "yesterday" +%d/%m/%Y); HOY=$(date +%d/%m/%Y)
           python -m monitor.main --dry-run --desde "$AYER" --hasta "$HOY" | tee data/dry_run.txt

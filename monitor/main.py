@@ -122,10 +122,7 @@ def _revision(cfg, args) -> int:
         else:
             from .scraper import Portal
             with Portal(cfg) as portal:
-                candidatos: list[Procedimiento] = []
-                for clave in cfg.claves:
-                    candidatos += portal.buscar(clave, desde, hasta)
-                candidatos = _fusionar(candidatos)
+                candidatos = _fusionar(portal.buscar_todo(cfg.claves, desde, hasta))
                 nuevos = [p for p in candidatos if not estado.tiene(p.numero)]
                 for p in nuevos:
                     portal.completar_detalle(p)
