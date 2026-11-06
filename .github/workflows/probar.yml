@@ -49,6 +49,25 @@ jobs:
           AYER=$(date -d "yesterday" +%d/%m/%Y); HOY=$(date +%d/%m/%Y)
           python -m monitor.main --dry-run --desde "$AYER" --hasta "$HOY" | tee data/dry_run.txt
 
+      - name: 5b. Revisión real x2 (Excel + sin duplicados; Telegram DESACTIVADO en este paso)
+        continue-on-error: true
+        env:
+          TELEGRAM_BOT_TOKEN: ""
+          TELEGRAM_CHAT_ID: ""
+        run: |
+          AYER=$(date -d "yesterday" +%d/%m/%Y); HOY=$(date +%d/%m/%Y)
+          echo "--- Primera revisión"; python -m monitor.main --desde "$AYER" --hasta "$HOY" 2>&1 | grep -E "encontrados|Excel|ERROR" 
+          echo "--- Segunda revisión (no debe detectar nuevos)"; python -m monitor.main --desde "$AYER" --hasta "$HOY" 2>&1 | grep -E "encontrados|Excel|ERROR"
+          python - <<'PY'
+          from openpyxl import load_workbook
+          wb = load_workbook("data/Registro_oportunidades.xlsx")
+          for ws in wb:
+              print(f"Hoja {ws.title}: {ws.max_row - 1} fila(s)")
+          ws = wb["Procedimientos"]
+          for fila in ws.iter_rows(min_row=1, max_row=4, values_only=True):
+              print([str(v)[:22] if v is not None else "" for v in fila[:13]])
+          PY
+
       - name: 6. Mensaje de prueba a Telegram
         if: ${{ github.event.inputs.telegram == 'true' }}
         run: python -m monitor.main --probar-telegram
@@ -62,5 +81,6 @@ jobs:
             data/descubrir/
             data/dry_run.txt
             data_demo/Registro_oportunidades.xlsx
+            data/Registro_oportunidades.xlsx
             data/logs/
           if-no-files-found: ignore
