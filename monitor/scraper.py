@@ -317,9 +317,12 @@ class Portal:
             pagina = 1
             for _ in range(MAX_PAGINAS):
                 mapa = self._mapa_tabla()
-                for k in range(self._filas().count()):
+                n_filas = self._filas().count()
+                log.info("Página %s: %s fila(s)", pagina, n_filas)
+                for k in range(n_filas):
                     celdas = [" ".join(t.split()) for t in self._filas().nth(k).locator("td").all_inner_texts()]
                     proc = self._proc_desde_celdas(celdas, mapa, claves)
+                    log.info("  fila %s: %s", k + 1, proc.numero if proc else f"(sin número) {celdas[:3]}")
                     if proc is None or proc.numero in resultados:
                         continue
                     resultados[proc.numero] = proc
@@ -341,7 +344,11 @@ class Portal:
         p = self.page
         p.go_back()
         p.wait_for_load_state("networkidle")
-        time.sleep(1.5)
+        try:
+            p.locator("table tbody tr").first.wait_for(state="visible", timeout=10000)
+        except Exception:
+            pass
+        time.sleep(1.0)
         if self._filas().count() == 0:  # el portal perdio los filtros: se repite la busqueda
             self._filtrar_y_buscar(tipo, claves, desde, hasta)
         for _ in range(pagina - 1):
@@ -354,9 +361,16 @@ class Portal:
         self._filas().nth(k).locator("td").nth(1).click()
         p.wait_for_url(re.compile(r"/detalle/"), timeout=15000)
         p.wait_for_load_state("networkidle")
+        for texto in ("CRONOGRAMA DE EVENTOS", "Descripción detallada"):  # el detalle carga por partes
+            try:
+                p.get_by_text(texto).first.wait_for(state="visible", timeout=20000)
+            except Exception:
+                log.warning("No apareció '%s' en el detalle de %s", texto, proc.numero)
         time.sleep(1.5)
         proc.url = p.url
         self._leer_detalle(proc)
+        log.info("Detalle %s: publicación=%s apertura=%s partidas=%s", proc.numero, proc.f_publicacion or "—",
+                 proc.f_apertura or "—", len(proc.partidas))
 
     def _leer_detalle(self, proc: Procedimiento) -> None:
         texto = self.page.inner_text("body")
