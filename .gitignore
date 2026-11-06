@@ -1,0 +1,11 @@
+.env
+__pycache__/
+*.pyc
+.venv/
+data/estado.json
+data/*.lock
+data/logs/
+data/descubrir/
+data_demo/
+~$*.xlsx
+data/historial/*.csv

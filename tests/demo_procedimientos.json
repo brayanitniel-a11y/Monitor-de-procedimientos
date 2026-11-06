@@ -1,0 +1,52 @@
+[
+  {
+    "numero": "DEMO-001-2026",
+    "entidad": "ENTIDAD DE PRUEBA 1",
+    "descripcion": "ADQUISICION DE EQUIPO MEDICO (DATOS DE EJEMPLO)",
+    "tipo": "Licitación pública",
+    "estatus": "Vigente",
+    "f_publicacion": "2026-11-06T00:00",
+    "f_junta": "2026-11-12T10:00",
+    "f_apertura": "2026-11-19T10:00",
+    "f_fallo": "2026-11-23T14:00",
+    "url": "https://example.com/demo-001",
+    "claves_filtro": ["53101"],
+    "partidas": [
+      {"numero": "1", "clave": "", "descripcion": "MONITOR DE SIGNOS VITALES BÁSICO", "cantidad": "10"},
+      {"numero": "2", "clave": "531.668.0065", "descripcion": "OXIMETRO DE PULSO PORTATIL", "cantidad": "5"},
+      {"numero": "3", "clave": "", "descripcion": "SILLA DE RUEDAS PLEGABLE", "cantidad": "20"}
+    ]
+  },
+  {
+    "numero": "DEMO-002-2026",
+    "entidad": "ENTIDAD DE PRUEBA 2",
+    "descripcion": "SERVICIO DE LIMPIEZA (DATOS DE EJEMPLO)",
+    "tipo": "Adjudicación directa",
+    "estatus": "Vigente",
+    "f_publicacion": "2026-11-06T00:00",
+    "f_junta": "",
+    "f_apertura": "2026-11-16T09:00",
+    "f_fallo": "",
+    "url": "",
+    "claves_filtro": ["32401"],
+    "partidas": [
+      {"numero": "1", "clave": "", "descripcion": "ARRENDAMIENTO DE ELECTROCARDIOGRAFO MULTICANAL", "cantidad": "3"}
+    ]
+  },
+  {
+    "numero": "DEMO-003-2026",
+    "entidad": "ENTIDAD DE PRUEBA 3",
+    "descripcion": "ADQUISICION DE MOBILIARIO (DATOS DE EJEMPLO)",
+    "tipo": "Licitación pública",
+    "estatus": "Vigente",
+    "f_publicacion": "2026-11-06T00:00",
+    "f_junta": "2026-11-11T10:00",
+    "f_apertura": "2026-11-18T10:00",
+    "f_fallo": "",
+    "url": "https://example.com/demo-003",
+    "claves_filtro": ["53101", "32401"],
+    "partidas": [
+      {"numero": "4", "clave": "", "descripcion": "ESCRITORIO EJECUTIVO", "cantidad": "2"}
+    ]
+  }
+]

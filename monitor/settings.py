@@ -1,0 +1,55 @@
+"""Configuracion: lee variables de entorno y el archivo .env (si existe)."""
+from __future__ import annotations
+
+import os
+from dataclasses import dataclass
+from pathlib import Path
+from zoneinfo import ZoneInfo
+
+BASE = Path(__file__).resolve().parent.parent
+
+
+def _leer_env(ruta: Path) -> None:
+    if not ruta.exists():
+        return
+    for linea in ruta.read_text(encoding="utf-8").splitlines():
+        linea = linea.strip()
+        if not linea or linea.startswith("#") or "=" not in linea:
+            continue
+        k, v = linea.split("=", 1)
+        os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+
+
+@dataclass
+class Config:
+    claves: list[str]
+    token: str
+    chat_id: str
+    tz: ZoneInfo
+    hora_corte: int
+    url: str
+    headless: bool
+    data_dir: Path
+    historial_csv: Path
+    excel: Path
+    demo: bool = False
+
+
+def cargar(demo: bool = False) -> Config:
+    _leer_env(BASE / ".env")
+    data_dir = BASE / ("data_demo" if demo else "data")
+    data_dir.mkdir(parents=True, exist_ok=True)
+    claves = [c.strip() for c in os.getenv("CLAVES_PARTIDA", "32401,53101").split(",") if c.strip()]
+    return Config(
+        claves=claves,
+        token=os.getenv("TELEGRAM_BOT_TOKEN", ""),
+        chat_id=os.getenv("TELEGRAM_CHAT_ID", ""),
+        tz=ZoneInfo(os.getenv("ZONA_HORARIA", "America/Mexico_City")),
+        hora_corte=int(os.getenv("HORA_CORTE_MANANA", "10")),
+        url=os.getenv("COMPRASMX_URL", "https://comprasmx.buengobierno.gob.mx/sitiopublico/#/"),
+        headless=os.getenv("HEADLESS", "1") != "0",
+        data_dir=data_dir,
+        historial_csv=BASE / "data" / "historial" / "Historico_cotizaciones_2025_2026_preliminar.csv",
+        excel=data_dir / "Registro_oportunidades.xlsx",
+        demo=demo,
+    )
