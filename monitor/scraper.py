@@ -162,7 +162,7 @@ class Portal:
         p.goto(self.cfg.url, wait_until="domcontentloaded")
         p.wait_for_load_state("networkidle")
         time.sleep(1.5)
-        if not p.locator("p-dropdown[name='ley']").first.is_visible():
+        if not p.locator("input[name='fechaDesdeP']").first.is_visible():  # filtros avanzados cerrados
             try:
                 p.get_by_text(re.compile(r"^\s*Filtros\s*$")).first.click(timeout=8000)
             except Exception:
