@@ -1,0 +1,64 @@
+name: Probar monitor
+
+on:
+  workflow_dispatch:
+    inputs:
+      telegram:
+        description: "Enviar mensaje de prueba a Telegram (requiere secrets)"
+        type: boolean
+        default: false
+  push:
+    branches: [main]
+
+jobs:
+  probar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: python -m playwright install --with-deps chromium
+
+      - name: 1. Pruebas unitarias
+        run: python -m unittest discover -s tests -t . -v
+
+      - name: 2. Demo completo (Excel + mensajes, sin portal ni Telegram)
+        run: python -m monitor.main --demo
+
+      - name: 3. ¿Se ve ComprasMX desde GitHub?
+        continue-on-error: true
+        run: |
+          curl -sS -m 30 -o /dev/null -w "ComprasMX http=%{http_code} tiempo=%{time_total}s\n" "https://comprasmx.buengobierno.gob.mx/sitiopublico/" || echo "NO ALCANZABLE desde GitHub"
+
+      - name: 4. Descubrir campos del portal
+        continue-on-error: true
+        run: python -m monitor.main --descubrir
+
+      - name: 5. Búsqueda real en seco (ayer y hoy, sin enviar ni guardar)
+        continue-on-error: true
+        run: |
+          AYER=$(date -d "yesterday" +%d/%m/%Y); HOY=$(date +%d/%m/%Y)
+          python -m monitor.main --dry-run --desde "$AYER" --hasta "$HOY" | tee data/dry_run.txt
+
+      - name: 6. Mensaje de prueba a Telegram
+        if: ${{ github.event.inputs.telegram == 'true' }}
+        run: python -m monitor.main --probar-telegram
+
+      - name: Guardar evidencias
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidencias
+          path: |
+            data/descubrir/
+            data/dry_run.txt
+            data_demo/Registro_oportunidades.xlsx
+            data/logs/
+          if-no-files-found: ignore

@@ -35,6 +35,12 @@ class Config:
     demo: bool = False
 
 
+def _historial() -> Path:
+    d = BASE / "data" / "historial"
+    completo = d / "Historico_cotizaciones_2025_2026_preliminar.csv"
+    return completo if completo.exists() else d / "historial_sin_precios.csv"
+
+
 def cargar(demo: bool = False) -> Config:
     _leer_env(BASE / ".env")
     data_dir = BASE / ("data_demo" if demo else "data")
@@ -49,7 +55,7 @@ def cargar(demo: bool = False) -> Config:
         url=os.getenv("COMPRASMX_URL", "https://comprasmx.buengobierno.gob.mx/sitiopublico/#/"),
         headless=os.getenv("HEADLESS", "1") != "0",
         data_dir=data_dir,
-        historial_csv=BASE / "data" / "historial" / "Historico_cotizaciones_2025_2026_preliminar.csv",
+        historial_csv=_historial(),
         excel=data_dir / "Registro_oportunidades.xlsx",
         demo=demo,
     )

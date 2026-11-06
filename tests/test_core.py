@@ -12,7 +12,7 @@ from monitor.estado import Estado
 from monitor.models import Partida, Procedimiento, fmt_fecha, parse_fecha
 from monitor.ventana import calcular_ventana
 
-CSV = Path(__file__).resolve().parent.parent / "data" / "historial" / "Historico_cotizaciones_2025_2026_preliminar.csv"
+CSV = Path(__file__).resolve().parent.parent / "data" / "historial" / "historial_sin_precios.csv"
 TZ = ZoneInfo("America/Mexico_City")
 
 

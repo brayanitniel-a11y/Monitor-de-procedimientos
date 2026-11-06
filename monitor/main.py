@@ -3,6 +3,7 @@
   python -m monitor.main                 # revision normal (la que programas 4 veces al dia)
   python -m monitor.main --dry-run       # busca y muestra mensajes, sin enviar ni guardar nada
   python -m monitor.main --demo          # prueba con datos de ejemplo (sin portal ni Telegram)
+  python -m monitor.main --probar-telegram  # mensaje de prueba al grupo
   python -m monitor.main --descubrir     # guarda captura y campos del portal para ajustar el scraper
   python -m monitor.main --desde 01/11/2026 --hasta 05/11/2026   # rango manual
 """
@@ -85,6 +86,11 @@ def _fusionar(lista: list[Procedimiento]) -> list[Procedimiento]:
 def ejecutar(args) -> int:
     cfg = settings.cargar(demo=args.demo)
     _configurar_log(cfg.data_dir)
+
+    if args.probar_telegram:
+        ok = telegram.enviar(cfg.token, cfg.chat_id, "✅ <b>Monitor de procedimientos</b>: prueba de conexión con el grupo.")
+        print("Telegram:", "enviado" if ok else "FALLÓ (revisa token e ID de grupo)")
+        return 0 if ok else 1
 
     if args.descubrir:
         from .scraper import Portal
@@ -180,6 +186,7 @@ def main() -> None:
     ap.add_argument("--dry-run", action="store_true", help="no envía a Telegram ni guarda")
     ap.add_argument("--demo", action="store_true", help="usa datos de ejemplo, carpeta data_demo/")
     ap.add_argument("--descubrir", action="store_true", help="guarda captura y campos del portal")
+    ap.add_argument("--probar-telegram", action="store_true", help="envía un mensaje de prueba al grupo")
     ap.add_argument("--desde", help="fecha inicial dd/mm/aaaa (rango manual)")
     ap.add_argument("--hasta", help="fecha final dd/mm/aaaa")
     sys.exit(ejecutar(ap.parse_args()))

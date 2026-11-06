@@ -84,6 +84,10 @@ def cargar(ruta: Path) -> list[ItemHistorial]:
             proc = (fila.get("numero_procedimiento") or "").strip()
             if proc and proc not in it.procs:
                 it.procs.append(proc)
+            if "solo_cotizacion" in fila:  # copia sin precios (tools/sanitizar_historial.py)
+                if fila["solo_cotizacion"].strip() == "0":
+                    it.reales += 1
+                continue
             obs = (fila.get("observaciones") or "").lower()
             try:
                 precio = float(fila.get("precio_unitario_sin_iva") or 0)

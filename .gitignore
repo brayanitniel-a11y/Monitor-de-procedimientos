@@ -9,3 +9,4 @@ data/descubrir/
 data_demo/
 ~$*.xlsx
 data/historial/*.csv
+!data/historial/historial_sin_precios.csv
