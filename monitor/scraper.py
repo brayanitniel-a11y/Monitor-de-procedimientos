@@ -392,6 +392,16 @@ class Portal:
                 return "|".join(" ".join(f["cells"]) for f in tabla["rows"])[:4000]
         return ""
 
+    def _esperar_estable(self, max_intentos: int = 12) -> None:
+        """Espera a que la tabla de renglones deje de cambiar (dos lecturas iguales seguidas)."""
+        previa = None
+        for _ in range(max_intentos):
+            actual = self._firma_renglones()
+            if actual and actual == previa:
+                return
+            previa = actual
+            time.sleep(0.8)
+
     def _leer_detalle(self, proc: Procedimiento) -> None:
         texto = self.page.inner_text("body")
         proc.f_publicacion = _fecha_cerca(texto, r"fecha y hora de publicaci[oó]n") or proc.f_publicacion
@@ -400,6 +410,7 @@ class Portal:
         proc.f_fallo = _fecha_cerca(texto, r"fecha y hora del acto del fallo") or proc.f_fallo
         partidas, codigos, vistos = [], [], set()
         for _pag in range(40):  # los renglones vienen paginados
+            self._esperar_estable()
             nuevos = 0
             for tabla in self.page.evaluate(JS_TABLAS):
                 hs = [_n(h) for h in tabla["headers"]]
