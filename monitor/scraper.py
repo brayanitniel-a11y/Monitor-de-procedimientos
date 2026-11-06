@@ -173,18 +173,26 @@ class Portal:
         self.page.locator(sel).locator(f".p-{tipo}").first.click()
         time.sleep(0.8)
 
-    def _opciones_dropdown(self, nombre: str) -> list[str]:
-        self._abrir_lista(nombre)
-        ops = [t.strip() for t in self.page.locator("li[role=option]").all_inner_texts() if t.strip()]
-        self.page.keyboard.press("Escape")
-        time.sleep(0.4)
-        return [o for o in ops if "no se encontraron" not in o.lower()]
+    def _opciones_dropdown(self, nombre: str, intentos: int = 6) -> list[str]:
+        """Lee las opciones; las listas dependientes cargan despues de elegir la ley, asi que reintenta."""
+        for _ in range(intentos):
+            self.page.wait_for_load_state("networkidle")
+            self._abrir_lista(nombre)
+            ops = [t.strip() for t in self.page.locator("li[role=option]").all_inner_texts() if t.strip()]
+            self.page.keyboard.press("Escape")
+            time.sleep(0.4)
+            ops = [o for o in ops if "no se encontraron" not in o.lower()]
+            if ops:
+                return ops
+            time.sleep(2)
+        return []
 
     def _elegir_dropdown(self, nombre: str, texto: re.Pattern | str) -> None:
         self._abrir_lista(nombre)
         pat = texto if isinstance(texto, re.Pattern) else re.compile(re.escape(texto), re.I)
         self.page.locator("li[role=option]").filter(has_text=pat).first.click()
-        time.sleep(0.8)
+        self.page.wait_for_load_state("networkidle")
+        time.sleep(1.2)
 
     def _elegir_claves(self, claves: list[str]) -> None:
         p = self.page
