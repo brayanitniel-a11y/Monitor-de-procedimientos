@@ -303,9 +303,41 @@ class Portal:
               texto: (document.body.innerText || '').slice(0, 2500),
             })""")
             (self.debug_dir / "campos_filtros.json").write_text(json.dumps(info2, ensure_ascii=False, indent=1), encoding="utf-8")
+            (self.debug_dir / "desplegables.json").write_text(
+                json.dumps(self._explorar_desplegables(), ensure_ascii=False, indent=1), encoding="utf-8")
         except Exception as e:
             (self.debug_dir / "campos_filtros.json").write_text(json.dumps({"error": str(e)}), encoding="utf-8")
         return ruta
+
+    def _explorar_desplegables(self) -> dict:
+        """Para cada filtro con lista, abre el desplegable y anota sus opciones y el HTML del widget."""
+        p, res = self.page, {}
+        js_opciones = """() => Array.from(document.querySelectorAll(
+            '[role=option], li[class*=item], .p-dropdown-item, .p-multiselect-item, mat-option, .ng-option, .dropdown-item'))
+            .filter(e => e.offsetWidth || e.offsetHeight).map(e => (e.innerText || '').trim()).filter(Boolean).slice(0, 40)"""
+        for etiqueta in ("Ley / Soporte normativo", "Tipo de contratación", "Tipo de procedimiento de contratación",
+                         "Clave - Descripción de partida específica", "Estatus"):
+            item = {}
+            try:
+                lab = p.locator(f"xpath=//*[contains(normalize-space(text()), '{etiqueta}')]").first
+                cont = lab.locator("xpath=ancestor::*[self::div or self::td or self::li][1]")
+                item["html"] = cont.evaluate("e => e.outerHTML")[:1800]
+                gatillo = cont.locator("[class*=dropdown], [class*=select], [class*=multiselect], [role=combobox], input:not([type=checkbox])").first
+                if etiqueta.startswith("Clave"):
+                    gatillo.click(timeout=4000)
+                    p.keyboard.type("32401", delay=80)
+                    time.sleep(2.5)
+                else:
+                    gatillo.click(timeout=4000)
+                    time.sleep(1.2)
+                item["opciones"] = p.evaluate(js_opciones)
+                self._captura("lista_" + etiqueta[:12].replace(" ", "_").replace("/", ""))
+                p.keyboard.press("Escape")
+                p.mouse.click(5, 5)
+            except Exception as e:
+                item["error"] = str(e)[:300]
+            res[etiqueta] = item
+        return res
 
 
 def _fecha_cerca(texto: str, patron: str) -> str:

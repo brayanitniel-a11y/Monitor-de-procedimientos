@@ -41,7 +41,7 @@ jobs:
         continue-on-error: true
         run: |
           python -m monitor.main --descubrir
-          echo "=== CAMPOS_FILTROS.JSON ==="; cat data/descubrir/campos_filtros.json
+          echo "=== DESPLEGABLES ==="; cat data/descubrir/desplegables.json
 
       - name: 5. Búsqueda real en seco (ayer y hoy, sin enviar ni guardar)
         continue-on-error: true
