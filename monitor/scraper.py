@@ -221,7 +221,7 @@ class Portal:
             self._escribir(ini.first, desde.strftime("%d/%m/%Y"))
             self._escribir(fin.first, hasta.strftime("%d/%m/%Y"))
             self._captura(f"filtros_llenos_{i}")
-            self.page.get_by_role("button", name=re.compile(r"^\s*Buscar\s*$", re.I)).first.click()
+            self._pulsar_buscar()
             self.page.wait_for_load_state("networkidle")
             time.sleep(2.5)
             self._captura(f"resultados_{i}")
@@ -236,6 +236,19 @@ class Portal:
                     break
         log.info("Procedimientos encontrados %s→%s: %s", desde, hasta, len(resultados))
         return list(resultados.values())
+
+    def _pulsar_buscar(self) -> None:
+        p = self.page
+        for loc in (p.get_by_text(re.compile(r"^\s*Buscar\s*$")), p.locator("button:has-text('Buscar'), a:has-text('Buscar'), p-button:has-text('Buscar')")):
+            try:
+                if loc.count():
+                    loc.last.click(timeout=8000)
+                    p.wait_for_load_state("networkidle")
+                    return
+            except Exception:
+                continue
+        self._captura("no_encontre_buscar")
+        raise PortalError("No encontré el botón Buscar")
 
     def _explorar_fila(self) -> None:
         """Depuracion: que pasa al abrir el primer resultado (URL y texto del detalle)."""
