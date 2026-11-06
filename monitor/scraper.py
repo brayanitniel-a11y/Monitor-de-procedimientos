@@ -320,7 +320,7 @@ class Portal:
                 n_filas = self._filas().count()
                 log.info("Página %s: %s fila(s)", pagina, n_filas)
                 for k in range(n_filas):
-                    celdas = [" ".join(t.split()) for t in self._filas().nth(k).locator("td").all_inner_texts()]
+                    celdas = self._celdas(k)
                     proc = self._proc_desde_celdas(celdas, mapa, claves)
                     log.info("  fila %s: %s", k + 1, proc.numero if proc else f"(sin número) {celdas[:3]}")
                     if proc is None or proc.numero in resultados:
@@ -339,6 +339,15 @@ class Portal:
                 pagina += 1
         log.info("Procedimientos encontrados %s→%s: %s", desde, hasta, len(resultados))
         return list(resultados.values())
+
+    def _celdas(self, k: int, intentos: int = 12) -> list[str]:
+        """Texto de las celdas de la fila k; tras volver del detalle la tabla tarda en repintarse."""
+        for _ in range(intentos):
+            celdas = [" ".join(t.split()) for t in self._filas().nth(k).locator("td").all_inner_texts()]
+            if any(celdas):
+                return celdas
+            time.sleep(1)
+        return []
 
     def _regresar(self, tipo, claves, desde, hasta, pagina: int) -> None:
         p = self.page
