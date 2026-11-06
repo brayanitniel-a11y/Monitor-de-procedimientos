@@ -122,10 +122,8 @@ def _revision(cfg, args) -> int:
         else:
             from .scraper import Portal
             with Portal(cfg) as portal:
-                candidatos = _fusionar(portal.buscar_todo(cfg.claves, desde, hasta))
+                candidatos = _fusionar(portal.buscar_todo(cfg.claves, desde, hasta, set(estado.procedimientos)))
                 nuevos = [p for p in candidatos if not estado.tiene(p.numero)]
-                for p in nuevos:
-                    portal.completar_detalle(p)
     except Exception as e:
         log.exception("La revisión falló")
         if enviar_real and estado.puede_alertar(ahora):

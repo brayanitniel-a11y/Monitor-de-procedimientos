@@ -35,10 +35,11 @@ ALIAS_LISTA = {
     "f_apertura": ["fecha de presentacion y apertura de proposiciones", "presentacion y apertura", "fecha de apertura"],
 }
 ALIAS_PARTIDAS = {
-    "numero": ["partida", "no. partida", "numero de partida", "no."],
-    "clave": ["clave", "clave cucop", "cucop"],
-    "descripcion": ["descripcion", "descripcion de la partida", "nombre"],
-    "cantidad": ["cantidad", "cantidad minima", "cant."],
+    "numero": ["num.", "no.", "partida"],
+    "clave": ["clave cucop+", "clave cucop", "cucop"],
+    "descripcion": ["descripcion detallada"],
+    "descripcion_cucop": ["descripcion cucop+", "descripcion cucop"],
+    "cantidad": ["cantidad solicitada", "cantidad"],
 }
 
 JS_TABLAS = """
@@ -157,13 +158,16 @@ class Portal:
 
     def _abrir_filtros(self) -> None:
         p = self.page
+        p.goto("about:blank")  # estado limpio: evita que el panel quede abierto/cerrado de la busqueda anterior
         p.goto(self.cfg.url, wait_until="domcontentloaded")
         p.wait_for_load_state("networkidle")
-        try:
-            p.get_by_text(re.compile(r"^\s*Filtros\s*$")).first.click(timeout=8000)
-        except Exception:
-            pass
         time.sleep(1.5)
+        if not p.locator("p-dropdown[name='ley']").first.is_visible():
+            try:
+                p.get_by_text(re.compile(r"^\s*Filtros\s*$")).first.click(timeout=8000)
+            except Exception:
+                pass
+            time.sleep(1.5)
         if p.locator("p-dropdown[name='ley']").count() == 0:
             self._captura("no_encontre_filtros")
             raise PortalError("No encontré el panel de filtros (p-dropdown 'ley'). Ejecuta: python -m monitor.main --descubrir")
@@ -174,7 +178,7 @@ class Portal:
         time.sleep(0.8)
 
     def _opciones_dropdown(self, nombre: str, intentos: int = 6) -> list[str]:
-        """Lee las opciones; las listas dependientes cargan despues de elegir la ley, asi que reintenta."""
+        """Las listas dependientes cargan despues de elegir la ley, asi que se reintenta."""
         for _ in range(intentos):
             self.page.wait_for_load_state("networkidle")
             self._abrir_lista(nombre)
@@ -187,7 +191,7 @@ class Portal:
             time.sleep(2)
         return []
 
-    def _elegir_dropdown(self, nombre: str, texto: re.Pattern | str) -> None:
+    def _elegir_dropdown(self, nombre: str, texto) -> None:
         self._abrir_lista(nombre)
         pat = texto if isinstance(texto, re.Pattern) else re.compile(re.escape(texto), re.I)
         self.page.locator("li[role=option]").filter(has_text=pat).first.click()
@@ -209,45 +213,8 @@ class Portal:
             p.keyboard.press("Escape")
             time.sleep(0.4)
 
-    def buscar_todo(self, claves: list[str], desde: date, hasta: date) -> list[Procedimiento]:
-        """Por cada tipo de contratación (campo obligatorio) busca las claves con la fecha de publicación."""
-        self._abrir_filtros()
-        self._elegir_dropdown("ley", self.LEY)
-        tipos = self._opciones_dropdown("contratacion")
-        log.info("Tipos de contratación disponibles: %s", tipos)
-        if not tipos:
-            self._captura("sin_tipos")
-            raise PortalError("No aparecieron tipos de contratación tras elegir la ley")
-        resultados: dict[str, Procedimiento] = {}
-        for i, tipo in enumerate(tipos):
-            if i:
-                self._abrir_filtros()
-                self._elegir_dropdown("ley", self.LEY)
-            self._elegir_dropdown("contratacion", re.compile(rf"^\s*{re.escape(tipo)}\s*$", re.I))
-            self._elegir_claves(claves)
-            ini, fin = self.page.locator("input[name='fechaDesdeP']"), self.page.locator("input[name='fechaHastaP']")
-            self._escribir_fecha(ini.first, desde)
-            self._escribir_fecha(fin.first, hasta)
-            log.info("Fechas en pantalla: desde=%r hasta=%r", ini.first.input_value(), fin.first.input_value())
-            self._captura(f"filtros_llenos_{i}")
-            self._pulsar_buscar()
-            self.page.wait_for_load_state("networkidle")
-            time.sleep(2.5)
-            self._captura(f"resultados_{i}")
-            total = re.search(r"Total:\s*(\d+)", self.page.inner_text("body"))
-            log.info("Tipo '%s': total reportado por el portal = %s", tipo, total.group(1) if total else "?")
-            if os.getenv("EXPLORAR") == "1" and i == 0:
-                self._explorar_fila()
-            for _ in range(MAX_PAGINAS):
-                for proc in self._leer_pagina_resultados(claves):
-                    resultados.setdefault(proc.numero, proc)
-                if not self._siguiente_pagina():
-                    break
-        log.info("Procedimientos encontrados %s→%s: %s", desde, hasta, len(resultados))
-        return list(resultados.values())
-
     def _escribir_fecha(self, loc, d: date) -> None:
-        """Calendario de PrimeNG: se escribe como una persona (tecla por tecla) y se confirma con Enter."""
+        """Calendario de PrimeNG: se escribe como una persona y se confirma con Enter."""
         loc.click()
         loc.press("Control+A")
         loc.press("Backspace")
@@ -260,7 +227,8 @@ class Portal:
 
     def _pulsar_buscar(self) -> None:
         p = self.page
-        for loc in (p.get_by_text(re.compile(r"^\s*Buscar\s*$")), p.locator("button:has-text('Buscar'), a:has-text('Buscar'), p-button:has-text('Buscar')")):
+        for loc in (p.get_by_text(re.compile(r"^\s*Buscar\s*$")),
+                    p.locator("button:has-text('Buscar'), a:has-text('Buscar'), p-button:has-text('Buscar')")):
             try:
                 if loc.count():
                     loc.last.click(timeout=8000)
@@ -271,45 +239,47 @@ class Portal:
         self._captura("no_encontre_buscar")
         raise PortalError("No encontré el botón Buscar")
 
-    def _explorar_fila(self) -> None:
-        """Depuracion: que pasa al abrir el primer resultado (URL y texto del detalle)."""
-        p = self.page
-        try:
-            fila = p.locator("table tbody tr").first
-            log.info("FILA1: %s", " | ".join(fila.locator("td").all_inner_texts())[:300])
-            antes = p.url
-            fila.locator("td").nth(1).click()
-            time.sleep(3)
-            log.info("DETALLE url antes=%s despues=%s", antes, p.url)
-            self._captura("detalle_explorado")
-            texto = p.inner_text("body")
-            log.info("DETALLE texto (resto):\n%s", texto[3500:7500])
-            log.info("DETALLE botones/pestañas: %s", p.evaluate("() => Array.from(document.querySelectorAll('button, a, [role=tab], .p-tabview-nav li')).map(e => (e.innerText||'').trim()).filter(Boolean).slice(0, 60)"))
-            log.info("DETALLE tablas: %s", json.dumps(p.evaluate(JS_TABLAS), ensure_ascii=False)[:2500])
-            p.go_back()
-            time.sleep(2)
-        except Exception as e:
-            log.info("DETALLE exploración falló: %s", e)
+    def _filtrar_y_buscar(self, tipo: str, claves: list[str], desde: date, hasta: date) -> str:
+        self._abrir_filtros()
+        self._elegir_dropdown("ley", self.LEY)
+        self._elegir_dropdown("contratacion", re.compile(rf"^\s*{re.escape(tipo)}\s*$", re.I))
+        self._elegir_claves(claves)
+        self._escribir_fecha(self.page.locator("input[name='fechaDesdeP']").first, desde)
+        self._escribir_fecha(self.page.locator("input[name='fechaHastaP']").first, hasta)
+        self._pulsar_buscar()
+        time.sleep(2.5)
+        total = re.search(r"Total:\s*(\d+)", self.page.inner_text("body"))
+        return total.group(1) if total else "?"
 
-    def _leer_pagina_resultados(self, claves: list[str]) -> list[Procedimiento]:
-        salida = []
+    # ---------- resultados ----------
+    def _filas(self):
+        return self.page.locator("table tbody tr")
+
+    def _mapa_tabla(self) -> dict[str, int]:
         for tabla in self.page.evaluate(JS_TABLAS):
             mapa = _mapear(tabla["headers"], ALIAS_LISTA)
-            if "numero" not in mapa:
-                continue
-            for fila in tabla["rows"]:
-                c = fila["cells"]
-                get = lambda campo: c[mapa[campo]] if campo in mapa and mapa[campo] < len(c) else ""
-                numero = get("numero").strip()
-                if not numero:
-                    continue
-                salida.append(Procedimiento(
-                    numero=numero, entidad=get("entidad"), descripcion=get("descripcion"),
-                    tipo=get("tipo"), estatus=get("estatus"),
-                    f_publicacion=parse_fecha(get("f_publicacion")), f_junta=parse_fecha(get("f_junta")),
-                    f_apertura=parse_fecha(get("f_apertura")),
-                    url=fila.get("href", ""), claves_filtro=list(claves)))
-        return salida
+            if "numero" in mapa:
+                return mapa
+        return {}
+
+    @staticmethod
+    def _proc_desde_celdas(c: list[str], mapa: dict[str, int], claves: list[str]) -> Procedimiento | None:
+        get = lambda campo: " ".join(c[mapa[campo]].split()) if campo in mapa and mapa[campo] < len(c) else ""
+        numero = get("numero")
+        if not numero:
+            return None
+        return Procedimiento(
+            numero=numero, entidad=get("entidad"), descripcion=get("descripcion"), tipo=get("tipo"),
+            estatus=get("estatus"), f_publicacion=parse_fecha(get("f_publicacion")),
+            f_junta=parse_fecha(get("f_junta")), f_apertura=parse_fecha(get("f_apertura")),
+            claves_filtro=list(claves))
+
+    def _pagina_actual(self) -> int:
+        t = self.page.locator(".p-paginator-page.p-highlight").first
+        try:
+            return int(t.inner_text()) if t.count() else 1
+        except Exception:
+            return 1
 
     def _siguiente_pagina(self) -> bool:
         p = self.page
@@ -324,41 +294,92 @@ class Portal:
             pass
         return False
 
-    # ---------- detalle ----------
-    def completar_detalle(self, proc: Procedimiento) -> None:
-        """Lee cronograma de eventos y partidas desde la pagina del procedimiento."""
-        if not proc.url:
-            proc.detalle_ok = False
-            return
-        try:
-            self.page.goto(proc.url, wait_until="domcontentloaded")
-            self.page.wait_for_load_state("networkidle")
-            time.sleep(1.5)
-            texto = self.page.inner_text("body")
-            proc.f_junta = proc.f_junta or _fecha_cerca(texto, r"junta de aclaraciones")
-            proc.f_apertura = _fecha_cerca(texto, r"presentaci[oó]n y apertura de proposiciones") or proc.f_apertura
-            proc.f_fallo = proc.f_fallo or _fecha_cerca(texto, r"\bfallo\b")
-            proc.f_publicacion = proc.f_publicacion or _fecha_cerca(texto, r"publicaci[oó]n")
-            proc.partidas = self._leer_partidas()
-            proc.detalle_ok = bool(proc.partidas)
-        except Exception as e:
-            log.warning("Detalle de %s falló: %s", proc.numero, e)
-            proc.detalle_ok = False
+    def buscar_todo(self, claves: list[str], desde: date, hasta: date, conocidos: set[str] | None = None) -> list[Procedimiento]:
+        """Por cada tipo de contratacion (campo obligatorio) busca las claves con la fecha de publicacion.
+        Solo abre el detalle de los procedimientos que no estan en `conocidos`."""
+        conocidos = conocidos or set()
+        self._abrir_filtros()
+        self._elegir_dropdown("ley", self.LEY)
+        tipos = self._opciones_dropdown("contratacion")
+        log.info("Tipos de contratación: %s", tipos)
+        if not tipos:
+            self._captura("sin_tipos")
+            raise PortalError("No aparecieron tipos de contratación tras elegir la ley")
+        resultados: dict[str, Procedimiento] = {}
+        for tipo in tipos:
+            total = self._filtrar_y_buscar(tipo, claves, desde, hasta)
+            log.info("Tipo '%s': el portal reporta %s procedimiento(s)", tipo, total)
+            self._captura(f"resultados_{tipo}")
+            if total in ("0", ""):
+                continue
+            pagina = 1
+            for _ in range(MAX_PAGINAS):
+                mapa = self._mapa_tabla()
+                for k in range(self._filas().count()):
+                    celdas = [" ".join(t.split()) for t in self._filas().nth(k).locator("td").all_inner_texts()]
+                    proc = self._proc_desde_celdas(celdas, mapa, claves)
+                    if proc is None or proc.numero in resultados:
+                        continue
+                    resultados[proc.numero] = proc
+                    if " ".join(proc.numero.upper().split()) in conocidos:
+                        continue
+                    try:
+                        self._abrir_detalle(k, proc)
+                    except Exception as e:
+                        log.warning("Detalle de %s falló: %s", proc.numero, e)
+                        proc.detalle_ok = False
+                    self._regresar(tipo, claves, desde, hasta, pagina)
+                if not self._siguiente_pagina():
+                    break
+                pagina += 1
+        log.info("Procedimientos encontrados %s→%s: %s", desde, hasta, len(resultados))
+        return list(resultados.values())
 
-    def _leer_partidas(self) -> list[Partida]:
-        partidas: list[Partida] = []
+    def _regresar(self, tipo, claves, desde, hasta, pagina: int) -> None:
+        p = self.page
+        p.go_back()
+        p.wait_for_load_state("networkidle")
+        time.sleep(1.5)
+        if self._filas().count() == 0:  # el portal perdio los filtros: se repite la busqueda
+            self._filtrar_y_buscar(tipo, claves, desde, hasta)
+        for _ in range(pagina - 1):
+            if self._pagina_actual() >= pagina or not self._siguiente_pagina():
+                break
+
+    # ---------- detalle ----------
+    def _abrir_detalle(self, k: int, proc: Procedimiento) -> None:
+        p = self.page
+        self._filas().nth(k).locator("td").nth(1).click()
+        p.wait_for_url(re.compile(r"/detalle/"), timeout=15000)
+        p.wait_for_load_state("networkidle")
+        time.sleep(1.5)
+        proc.url = p.url
+        self._leer_detalle(proc)
+
+    def _leer_detalle(self, proc: Procedimiento) -> None:
+        texto = self.page.inner_text("body")
+        proc.f_publicacion = _fecha_cerca(texto, r"fecha y hora de publicaci[oó]n") or proc.f_publicacion
+        proc.f_junta = _fecha_cerca(texto, r"fecha y hora de junta de aclaraciones") or proc.f_junta
+        proc.f_apertura = _fecha_cerca(texto, r"fecha y hora de presentaci[oó]n y apertura") or proc.f_apertura
+        proc.f_fallo = _fecha_cerca(texto, r"fecha y hora del acto del fallo") or proc.f_fallo
+        partidas, codigos = [], []
         for tabla in self.page.evaluate(JS_TABLAS):
             hs = [_n(h) for h in tabla["headers"]]
-            if not any("descripcion" in h for h in hs) or not any("partida" in h or "clave" in h for h in hs):
-                continue
-            mapa = _mapear(tabla["headers"], ALIAS_PARTIDAS)
-            for fila in tabla["rows"]:
-                c = fila["cells"]
-                get = lambda campo: c[mapa[campo]] if campo in mapa and mapa[campo] < len(c) else ""
-                if get("descripcion"):
-                    partidas.append(Partida(numero=get("numero"), clave=get("clave"),
-                                            descripcion=get("descripcion"), cantidad=get("cantidad")))
-        return partidas
+            if "clave" in hs and "descripcion" in hs and len(hs) == 2:  # partidas presupuestales (53101, ...)
+                codigos += [f["cells"][0] for f in tabla["rows"] if f["cells"]]
+            elif any("descripcion detallada" in h for h in hs):  # renglones del procedimiento
+                mapa = _mapear(tabla["headers"], ALIAS_PARTIDAS)
+                for fila in tabla["rows"]:
+                    c = fila["cells"]
+                    get = lambda campo: " ".join(c[mapa[campo]].split()) if campo in mapa and mapa[campo] < len(c) else ""
+                    desc = get("descripcion") or get("descripcion_cucop")
+                    if desc:
+                        partidas.append(Partida(numero=get("numero"), clave=get("clave"), descripcion=desc,
+                                                cantidad=get("cantidad")))
+        proc.partidas = partidas
+        if codigos:
+            proc.claves_filtro = sorted(set(codigos))
+        proc.detalle_ok = bool(partidas)
 
     # ---------- depuracion ----------
     def descubrir(self) -> Path:
