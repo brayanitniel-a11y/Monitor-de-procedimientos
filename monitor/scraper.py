@@ -430,6 +430,12 @@ class Portal:
                                                     cantidad=get("cantidad")))
             sig = self.page.locator("p-table", has=self.page.locator("th", has_text="Descripción detallada")) \
                 .locator("button.p-paginator-next:not(.p-disabled):not([disabled])")
+            if os.getenv("DIAG") == "1":
+                pag = self.page.locator("p-table", has=self.page.locator("th", has_text="Descripción detallada"))
+                log.info("DIAG %s pág %s: filas_nuevas=%s acumuladas=%s p-table=%s siguiente=%s texto_paginador=%r rpp=%r",
+                         proc.numero, _pag + 1, nuevos, len(partidas), pag.count(), sig.count(),
+                         (pag.locator(".p-paginator").first.inner_text()[:80] if pag.locator(".p-paginator").count() else None),
+                         (pag.locator(".p-paginator-rpp-options").first.inner_text()[:40] if pag.locator(".p-paginator-rpp-options").count() else None))
             if not nuevos or not sig.count() or not sig.first.is_visible():
                 break
             antes = self._firma_renglones()
