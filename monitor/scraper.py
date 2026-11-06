@@ -385,6 +385,13 @@ class Portal:
         log.info("Detalle %s: publicación=%s apertura=%s partidas=%s", proc.numero, proc.f_publicacion or "—",
                  proc.f_apertura or "—", len(proc.partidas))
 
+    def _firma_renglones(self) -> str:
+        """Huella del contenido visible de la tabla de renglones (para detectar el cambio de pagina)."""
+        for tabla in self.page.evaluate(JS_TABLAS):
+            if any("descripcion detallada" in _n(h) for h in tabla["headers"]):
+                return "|".join(" ".join(f["cells"]) for f in tabla["rows"])[:4000]
+        return ""
+
     def _leer_detalle(self, proc: Procedimiento) -> None:
         texto = self.page.inner_text("body")
         proc.f_publicacion = _fecha_cerca(texto, r"fecha y hora de publicaci[oó]n") or proc.f_publicacion
@@ -414,8 +421,12 @@ class Portal:
                 .locator("button.p-paginator-next:not(.p-disabled):not([disabled])")
             if not nuevos or not sig.count() or not sig.first.is_visible():
                 break
+            antes = self._firma_renglones()
             sig.first.click()
-            time.sleep(1.0)
+            for _ in range(15):  # esperar a que la tabla muestre otra pagina
+                time.sleep(0.7)
+                if self._firma_renglones() != antes:
+                    break
         codigos = sorted(set(codigos))
         proc.partidas = partidas
         if codigos:
