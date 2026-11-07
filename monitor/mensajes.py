@@ -37,7 +37,7 @@ def formatear(p: Procedimiento) -> str:
         marca = f" · {_e(x.similar_marca_modelo, 60)}" if x.similar_marca_modelo else ""
         veces = f" · {x.similar_veces}x" if x.similar_veces else ""
         aviso = " (solo cotización)" if x.similar_dudoso else ""
-        L.append(f"• Partida {_e(x.numero or '-', 10)}: {_e(x.descripcion, 90)}\n   ↳ ya visto: {_e(x.similar_desc, 80)}{marca}{veces}{aviso}")
+        L.append(f"• Partida {_e(x.numero or '-', 10)}: {_e(x.descripcion, 90)}\n   ↳ posible partida de interés: {_e(x.similar_desc, 80)}{marca}{veces}{aviso}")
     if len(con) > 5:
         L.append(f"… y {len(con) - 5} partidas más con coincidencia (ver Excel)")
     sin = len(p.partidas) - len(con)

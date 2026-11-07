@@ -118,5 +118,43 @@ class Registro(unittest.TestCase):
             self.assertEqual(len(otro.pendientes()), 1)
 
 
+
+class Mensajes(unittest.TestCase):
+    def test_texto_posible_partida_de_interes(self):
+        from monitor import mensajes
+        p = Procedimiento(numero="LA-1", partidas=[Partida(numero="1", descripcion="MONITOR DE SIGNOS VITALES")])
+        matcher.evaluar_procedimiento(p, historial.cargar(CSV))
+        txt = mensajes.formatear(p)
+        self.assertIn("posible partida de interés", txt)
+        self.assertNotIn("ya visto", txt)
+
+
+class Telegram(unittest.TestCase):
+    def test_documento_se_arma_y_se_envia(self):
+        import io
+        from unittest import mock
+
+        from monitor import telegram
+        with tempfile.TemporaryDirectory() as d:
+            f = Path(d) / "r.xlsx"
+            f.write_bytes(b"PK-contenido-falso")
+            visto = {}
+
+            def falso(req, timeout=0):
+                visto["url"], visto["cuerpo"], visto["tipo"] = req.full_url, req.data, req.headers["Content-type"]
+                return io.BytesIO(b'{"ok": true}')
+
+            with mock.patch("urllib.request.urlopen", falso):
+                self.assertTrue(telegram.enviar_documento("TOK", "-100", f, "pie"))
+            self.assertTrue(visto["url"].endswith("/botTOK/sendDocument"))
+            self.assertIn(b'filename="r.xlsx"', visto["cuerpo"])
+            self.assertIn(b"PK-contenido-falso", visto["cuerpo"])
+            self.assertIn("multipart/form-data; boundary=", visto["tipo"])
+
+    def test_documento_sin_archivo_falla_limpio(self):
+        from monitor import telegram
+        self.assertFalse(telegram.enviar_documento("T", "1", "/no/existe.xlsx"))
+
+
 if __name__ == "__main__":
     unittest.main()

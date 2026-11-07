@@ -90,6 +90,9 @@ def ejecutar(args) -> int:
     if args.probar_telegram:
         ok = telegram.enviar(cfg.token, cfg.chat_id, "✅ <b>Monitor de procedimientos</b>: prueba de conexión con el grupo.")
         print("Telegram:", "enviado" if ok else "FALLÓ (revisa token e ID de grupo)")
+        if ok and args.adjunto:
+            ok = telegram.enviar_documento(cfg.token, cfg.chat_id, args.adjunto, "🧪 Prueba de envío del Excel (datos de ejemplo, no son procedimientos reales).")
+            print("Telegram documento:", "enviado" if ok else "FALLÓ")
         return 0 if ok else 1
 
     if args.descubrir:
@@ -173,6 +176,14 @@ def _revision(cfg, args) -> int:
         log.info("Excel actualizado: %s fila(s) nuevas", agregadas)
     except PermissionError:
         log.warning("El Excel está abierto; se completará en la próxima revisión")
+        return 0
+    # Al final de una revisión con novedades se manda el Excel al grupo (una sola vez, sin spam si no hubo nada nuevo)
+    if agregadas and not cfg.demo:
+        pie = f"📎 <b>Registro de oportunidades</b> actualizado: {agregadas} procedimiento(s) nuevo(s) en la revisión de las {etiqueta}."
+        if telegram.enviar_documento(cfg.token, cfg.chat_id, cfg.excel, pie):
+            log.info("Excel enviado a Telegram")
+        else:
+            log.warning("No se pudo enviar el Excel a Telegram (los avisos de texto sí se enviaron)")
     return 0
 
 
@@ -182,6 +193,7 @@ def main() -> None:
     ap.add_argument("--demo", action="store_true", help="usa datos de ejemplo, carpeta data_demo/")
     ap.add_argument("--descubrir", action="store_true", help="guarda captura y campos del portal")
     ap.add_argument("--probar-telegram", action="store_true", help="envía un mensaje de prueba al grupo")
+    ap.add_argument("--adjunto", help="con --probar-telegram: archivo a enviar como prueba")
     ap.add_argument("--desde", help="fecha inicial dd/mm/aaaa (rango manual)")
     ap.add_argument("--hasta", help="fecha final dd/mm/aaaa")
     sys.exit(ejecutar(ap.parse_args()))

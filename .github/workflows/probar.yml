@@ -104,8 +104,10 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -r requirements.txt
-      - name: Mensaje de prueba a Telegram
-        run: python -m monitor.main --probar-telegram
+      - name: Mensaje y Excel de prueba a Telegram
+        run: |
+          python -m monitor.main --demo > /dev/null
+          python -m monitor.main --probar-telegram --adjunto data_demo/Registro_oportunidades.xlsx
 
   diag:
     if: ${{ github.event.inputs.diag_url != '' }}
