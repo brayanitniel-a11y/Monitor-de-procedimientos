@@ -58,10 +58,10 @@ jobs:
           AYER=$(date -d "yesterday" +%d/%m/%Y); HOY=$(date +%d/%m/%Y)
           python -m monitor.main --dry-run --desde "$AYER" --hasta "$HOY" | tee data/dry_run.txt
 
-      - name: 5a. Contraste SIN modo ligero (mismo rango; solo para comparar)
+      - name: 5a. Contraste CON modo ligero 1 (sin imágenes/video; mismo rango)
         continue-on-error: true
         env:
-          MODO_LIGERO: "0"
+          MODO_LIGERO: "1"
         run: |
           AYER=$(date -d "yesterday" +%d/%m/%Y); HOY=$(date +%d/%m/%Y)
           python -m monitor.main --dry-run --desde "$AYER" --hasta "$HOY" 2>&1 | grep -E "INFO (Tipo|Procedimientos|[0-9]+ encontrados)|WARNING|ERROR"

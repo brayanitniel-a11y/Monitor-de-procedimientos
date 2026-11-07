@@ -107,9 +107,11 @@ class Portal:
             headless=self.cfg.headless, args=["--disable-dev-shm-usage", "--disable-gpu", "--no-sandbox"])
         ctx = self._browser.new_context(locale="es-MX", viewport={"width": 1500, "height": 1000})
         ctx.set_default_timeout(45000)
-        if self.cfg.modo_ligero:  # sin imagenes, fuentes ni video: menos RAM, CPU y datos
+        # MODO_LIGERO: "0" = normal; "1" = sin imágenes ni video. Bloquear también las fuentes rompe el
+        # calendario del portal (el filtro de fecha se ignora), por eso no hay un nivel que las bloquee.
+        if self.cfg.modo_ligero == "1":
             ctx.route("**/*", lambda ruta: ruta.abort()
-                      if ruta.request.resource_type in ("image", "media", "font") else ruta.continue_())
+                      if ruta.request.resource_type in ("image", "media") else ruta.continue_())
         self.page = ctx.new_page()
         return self
 
