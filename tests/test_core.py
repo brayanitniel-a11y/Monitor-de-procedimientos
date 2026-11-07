@@ -35,6 +35,26 @@ class Ventana(unittest.TestCase):
         self.assertEqual(calcular_ventana(hora(13), date(2026, 9, 1))[0], date(2026, 10, 30))
 
 
+class VentanaFinDeSemana(unittest.TestCase):
+    """Entre semana 8/13/18/21; sabado y domingo solo 19:30. Nada debe quedar sin cubrir."""
+
+    def test_sabado_cubre_desde_el_viernes_noche(self):
+        sab = datetime(2026, 11, 7, 19, 30, tzinfo=TZ)           # sabado 19:30
+        self.assertEqual(calcular_ventana(sab, date(2026, 11, 6)), (date(2026, 11, 6), date(2026, 11, 7)))
+
+    def test_domingo_cubre_sabado_noche(self):
+        dom = datetime(2026, 11, 8, 19, 30, tzinfo=TZ)
+        self.assertEqual(calcular_ventana(dom, date(2026, 11, 7)), (date(2026, 11, 7), date(2026, 11, 8)))
+
+    def test_lunes_manana_cubre_domingo_noche(self):
+        lun = datetime(2026, 11, 9, 8, 0, tzinfo=TZ)
+        self.assertEqual(calcular_ventana(lun, date(2026, 11, 8)), (date(2026, 11, 8), date(2026, 11, 8)))
+
+    def test_fin_de_semana_sin_revisiones_se_recupera(self):
+        lun = datetime(2026, 11, 9, 8, 0, tzinfo=TZ)             # el equipo estuvo apagado desde el viernes
+        self.assertEqual(calcular_ventana(lun, date(2026, 11, 6)), (date(2026, 11, 6), date(2026, 11, 8)))
+
+
 class Fechas(unittest.TestCase):
     def test_parse(self):
         self.assertEqual(parse_fecha("19/11/2026 10:00 hrs"), "2026-11-19T10:00")

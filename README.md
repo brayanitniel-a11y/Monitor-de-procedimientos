@@ -63,27 +63,59 @@ en `monitor/scraper.py`. Con `HEADLESS=0` en `.env` puedes ver el navegador.
 
 Prueba sin portal ni Telegram: `python -m monitor.main --demo` (usa `data_demo/`).
 
-## Programación (8:00, 13:00, 18:00 y 21:00, hora CDMX)
+## Programación
 
-Linux / Mac (`crontab -e`):
+| Días | Horas (CDMX) |
+|---|---|
+| Lunes a viernes | 8:00, 13:00, 18:00 y 21:00 |
+| Sábado y domingo | solo 19:30 |
+
+No quedan huecos: cada revisión consulta desde la última revisión exitosa. El sábado a las 19:30 revisa
+desde el viernes (cubre el viernes después de las 21:00), el domingo desde el sábado, y el lunes a las 8:00
+revisa el domingo. Lo ya avisado nunca se repite.
+
+**Linux / Mac** (`crontab -e`):
 
 ```
 CRON_TZ=America/Mexico_City
-0 8,13,18,21 * * * cd /ruta/Monitor-de-procedimientos && .venv/bin/python -m monitor.main >> data/logs/cron.log 2>&1
+0 8,13,18,21 * * 1-5 cd /ruta/Monitor-de-procedimientos && nice -n 10 .venv/bin/python -m monitor.main >> data/logs/cron.log 2>&1
+30 19 * * 6,0       cd /ruta/Monitor-de-procedimientos && nice -n 10 .venv/bin/python -m monitor.main >> data/logs/cron.log 2>&1
 ```
 
-Windows (Programador de tareas, en PowerShell):
+**Windows** (Programador de tareas, PowerShell). "Iniciar en" debe ser la carpeta del repo para que encuentre `.env`:
 
 ```powershell
-foreach ($h in "08:00","13:00","18:00","21:00") {
-  schtasks /Create /TN "MonitorCompras_$($h.Replace(':',''))" /SC DAILY /ST $h `
-    /TR "C:\ruta\Monitor-de-procedimientos\.venv\Scripts\python.exe -m monitor.main" /F
+$py  = "C:\ruta\Monitor-de-procedimientos\.venv\Scripts\python.exe"
+$dir = "C:\ruta\Monitor-de-procedimientos"
+function Programar($nombre, $dias, $hora) {
+  $a = New-ScheduledTaskAction -Execute $py -Argument "-m monitor.main" -WorkingDirectory $dir
+  $t = New-ScheduledTaskTrigger -Weekly -DaysOfWeek $dias -At $hora
+  $s = New-ScheduledTaskSettingsSet -StartWhenAvailable -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Minutes 30)
+  Register-ScheduledTask -TaskName $nombre -Action $a -Trigger $t -Settings $s -Force | Out-Null
 }
+foreach ($h in "08:00","13:00","18:00","21:00") { Programar "MonitorCompras_SEM_$($h.Replace(':',''))" Monday,Tuesday,Wednesday,Thursday,Friday $h }
+Programar "MonitorCompras_FINDE_1930" Saturday,Sunday "19:30"
 ```
-(En Windows agrega `/SD` o usa "Iniciar en" = la carpeta del repo para que encuentre `.env`.)
 
-Si el otro bot corre a alguna de estas horas, desplaza este unos minutos (por ejemplo `5 8,13,18,21`)
-para que no abran dos navegadores a la vez. Un candado (`data/monitor.lock`) evita que dos revisiones se pisen.
+`StartWhenAvailable` hace que, si la computadora estaba apagada a esa hora, la revisión corra al encenderse.
+
+## Convivencia con el otro bot (vigilante-comprasmx)
+
+Los dos proyectos son independientes y **pueden correr al mismo tiempo**; no hay que coordinar horarios:
+
+- Cada uno tiene su carpeta, su entorno virtual, su `.env`, su estado y su candado. El candado
+  (`data/monitor.lock`) es solo de este repo: evita que dos revisiones *de este mismo monitor* se pisen
+  (por ejemplo, si una tarda más de lo normal), y no bloquea al otro bot.
+- Cada revisión abre su propio navegador, aislado. No comparten perfil, cookies ni puertos.
+- **Modo ligero** (`MODO_LIGERO=1`, por defecto): el navegador no descarga imágenes, fuentes ni video. Usa menos
+  memoria y CPU, y las dos revisiones juntas no deberían notarse. El monitor lee el texto de las tablas, no necesita las imágenes.
+- En Linux/Mac, `nice -n 10` le da prioridad baja a este monitor frente a otras tareas del equipo.
+- **Reintento automático:** si una revisión falla (equipo ocupado, portal lento), espera 90 s y lo intenta una vez más
+  antes de avisar por Telegram. Se ajusta con `REINTENTO_SEG`.
+- Ambos bots pueden escribir al mismo grupo de Telegram sin problema; los mensajes de este monitor llevan su propio
+  encabezado (🟢/🟡/⚪ NUEVO · número) y usan un token distinto si creaste otro bot.
+- Lo único compartido es la salida a internet y el portal. Con dos revisiones a la vez el portal ve dos navegadores
+  desde la misma IP, igual que dos personas en la misma oficina.
 
 ## Historial
 

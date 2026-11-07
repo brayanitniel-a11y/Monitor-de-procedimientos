@@ -103,9 +103,13 @@ class Portal:
     def __enter__(self):
         from playwright.sync_api import sync_playwright
         self._pw = sync_playwright().start()
-        self._browser = self._pw.chromium.launch(headless=self.cfg.headless)
+        self._browser = self._pw.chromium.launch(
+            headless=self.cfg.headless, args=["--disable-dev-shm-usage", "--disable-gpu", "--no-sandbox"])
         ctx = self._browser.new_context(locale="es-MX", viewport={"width": 1500, "height": 1000})
-        ctx.set_default_timeout(30000)
+        ctx.set_default_timeout(45000)
+        if self.cfg.modo_ligero:  # sin imagenes, fuentes ni video: menos RAM, CPU y datos
+            ctx.route("**/*", lambda ruta: ruta.abort()
+                      if ruta.request.resource_type in ("image", "media", "font") else ruta.continue_())
         self.page = ctx.new_page()
         return self
 

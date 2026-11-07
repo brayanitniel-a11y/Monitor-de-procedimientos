@@ -106,6 +106,22 @@ def ejecutar(args) -> int:
         return _revision(cfg, args)
 
 
+def _consultar_portal(cfg, desde, hasta, estado, intentos: int = 2) -> list[Procedimiento]:
+    """Consulta el portal; si falla (equipo ocupado con el otro bot, portal lento), espera y reintenta una vez
+    antes de dar por fallida la revisión."""
+    from .scraper import Portal
+    for n in range(1, intentos + 1):
+        try:
+            with Portal(cfg) as portal:
+                return _fusionar(portal.buscar_todo(cfg.claves, desde, hasta, set(estado.procedimientos)))
+        except Exception as e:
+            if n == intentos:
+                raise
+            log.warning("Intento %s/%s falló (%s: %s); se reintenta en %s s", n, intentos, type(e).__name__, str(e)[:120], cfg.reintento_seg)
+            time.sleep(cfg.reintento_seg)
+    return []
+
+
 def _revision(cfg, args) -> int:
     estado = Estado.cargar(cfg.data_dir / "estado.json")
     items = historial.cargar(cfg.historial_csv)
@@ -123,10 +139,8 @@ def _revision(cfg, args) -> int:
             candidatos = _fusionar(_cargar_demo())
             nuevos = [p for p in candidatos if not estado.tiene(p.numero)]
         else:
-            from .scraper import Portal
-            with Portal(cfg) as portal:
-                candidatos = _fusionar(portal.buscar_todo(cfg.claves, desde, hasta, set(estado.procedimientos)))
-                nuevos = [p for p in candidatos if not estado.tiene(p.numero)]
+            candidatos = _consultar_portal(cfg, desde, hasta, estado)
+            nuevos = [p for p in candidatos if not estado.tiene(p.numero)]
     except Exception as e:
         log.exception("La revisión falló")
         if enviar_real and estado.puede_alertar(ahora):
