@@ -70,9 +70,6 @@ jobs:
               print([str(v)[:22] if v is not None else "" for v in fila[:13]])
           PY
 
-      - name: 6. Mensaje de prueba a Telegram
-        if: ${{ github.event.inputs.telegram == 'true' }}
-        run: python -m monitor.main --probar-telegram
 
       - name: Guardar evidencias
         if: always()
@@ -86,3 +83,18 @@ jobs:
             data/Registro_oportunidades.xlsx
             data/logs/
           if-no-files-found: ignore
+
+  telegram:
+    if: ${{ github.event.inputs.telegram == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Mensaje de prueba a Telegram
+        run: python -m monitor.main --probar-telegram
