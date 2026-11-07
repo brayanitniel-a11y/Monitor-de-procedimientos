@@ -7,6 +7,10 @@ on:
         description: "Enviar mensaje de prueba a Telegram (requiere secrets)"
         type: boolean
         default: false
+      enviar_fecha:
+        description: "Revisión REAL con envío a Telegram de lo publicado en esta fecha (dd/mm/aaaa)"
+        type: string
+        default: ""
       diag_url:
         description: "URL de detalle de un procedimiento para diagnosticar la lectura de partidas"
         type: string
@@ -16,7 +20,7 @@ on:
 
 jobs:
   probar:
-    if: ${{ !(github.event_name == 'workflow_dispatch' && (github.event.inputs.telegram == 'true' || github.event.inputs.diag_url != '')) }}
+    if: ${{ !(github.event_name == 'workflow_dispatch' && (github.event.inputs.telegram == 'true' || github.event.inputs.diag_url != '' || github.event.inputs.enviar_fecha != '')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
@@ -116,3 +120,20 @@ jobs:
       - run: python -m playwright install --with-deps chromium
       - name: Lectura real de partidas (3 veces, debe dar 19 en el procedimiento de prueba)
         run: python tools/diag_leer.py "${{ github.event.inputs.diag_url }}" 19
+
+  enviar:
+    if: ${{ github.event.inputs.enviar_fecha != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - run: python -m playwright install --with-deps chromium
+      - name: Revisión real con envío a Telegram
+        run: python -m monitor.main --desde "${{ github.event.inputs.enviar_fecha }}" --hasta "${{ github.event.inputs.enviar_fecha }}" 2>&1 | grep -E "INFO|ERROR|WARNING"
