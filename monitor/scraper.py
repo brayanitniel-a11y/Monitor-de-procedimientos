@@ -386,21 +386,26 @@ class Portal:
                  proc.f_apertura or "—", len(proc.partidas))
 
     def _firma_renglones(self) -> str:
-        """Huella del contenido visible de la tabla de renglones (para detectar el cambio de pagina)."""
+        """Huella de TODAS las tablas de renglones visibles. Algunos procedimientos traen una tabla
+        por renglón (p. ej. 19 tablas de 1 fila) que la página dibuja poco a poco, así que se vigila
+        el conjunto completo y no solo la primera tabla."""
+        partes = []
         for tabla in self.page.evaluate(JS_TABLAS):
             if any("descripcion detallada" in _n(h) for h in tabla["headers"]):
-                return "|".join(" ".join(f["cells"]) for f in tabla["rows"])[:4000]
-        return ""
+                partes.append(f"{len(tabla['rows'])}:" + "|".join(" ".join(f["cells"]) for f in tabla["rows"]))
+        return f"{len(partes)}#" + "||".join(partes)[:30000] if partes else ""
 
-    def _esperar_estable(self, max_intentos: int = 12) -> None:
-        """Espera a que la tabla de renglones deje de cambiar (dos lecturas iguales seguidas)."""
-        previa = None
+    def _esperar_estable(self, max_intentos: int = 25, iguales: int = 3) -> None:
+        """Espera a que el conjunto de renglones deje de cambiar (varias lecturas iguales seguidas)."""
+        previa, seguidas = None, 0
         for _ in range(max_intentos):
             actual = self._firma_renglones()
-            if actual and actual == previa:
+            seguidas = seguidas + 1 if (actual and actual == previa) else 0
+            if seguidas >= iguales - 1:
                 return
             previa = actual
-            time.sleep(0.8)
+            time.sleep(1.0)
+        log.warning("Los renglones no se estabilizaron; se usa la última lectura")
 
     def _leer_detalle(self, proc: Procedimiento) -> None:
         texto = self.page.inner_text("body")

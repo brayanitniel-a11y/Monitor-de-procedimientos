@@ -50,8 +50,6 @@ jobs:
 
       - name: 5. Búsqueda real en seco (ayer y hoy, sin enviar ni guardar)
         continue-on-error: true
-        env:
-          DIAG: "1"
         run: |
           AYER=$(date -d "yesterday" +%d/%m/%Y); HOY=$(date +%d/%m/%Y)
           python -m monitor.main --dry-run --desde "$AYER" --hasta "$HOY" | tee data/dry_run.txt
