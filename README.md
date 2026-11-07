@@ -107,8 +107,8 @@ Los dos proyectos son independientes y **pueden correr al mismo tiempo**; no hay
   (`data/monitor.lock`) es solo de este repo: evita que dos revisiones *de este mismo monitor* se pisen
   (por ejemplo, si una tarda más de lo normal), y no bloquea al otro bot.
 - Cada revisión abre su propio navegador, aislado. No comparten perfil, cookies ni puertos.
-- **Modo ligero** (`MODO_LIGERO=1`, por defecto): el navegador no descarga imágenes, fuentes ni video. Usa menos
-  memoria y CPU, y las dos revisiones juntas no deberían notarse. El monitor lee el texto de las tablas, no necesita las imágenes.
+- **Consumo:** cada revisión abre un solo Chromium sin ventana, unos 2–4 minutos, y lo cierra al terminar. Dos revisiones a la vez
+  usan algo menos de 1 GB de RAM en total. (No se bloquean imágenes ni fuentes para ahorrar: se probó y el portal deja de aplicar el filtro de fecha.)
 - En Linux/Mac, `nice -n 10` le da prioridad baja a este monitor frente a otras tareas del equipo.
 - **Reintento automático:** si una revisión falla (equipo ocupado, portal lento), espera 90 s y lo intenta una vez más
   antes de avisar por Telegram. Se ajusta con `REINTENTO_SEG`.

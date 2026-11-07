@@ -32,7 +32,6 @@ class Config:
     data_dir: Path
     historial_csv: Path
     excel: Path
-    modo_ligero: str = "0"
     max_resultados: int = 60
     reintento_seg: int = 90
     demo: bool = False
@@ -61,7 +60,6 @@ def cargar(demo: bool = False) -> Config:
         historial_csv=_historial(),
         excel=data_dir / "Registro_oportunidades.xlsx",
         max_resultados=int(os.getenv("MAX_RESULTADOS", "60")),
-        modo_ligero=os.getenv("MODO_LIGERO", "0").strip(),
         reintento_seg=int(os.getenv("REINTENTO_SEG", "90")),
         demo=demo,
     )
