@@ -3,6 +3,7 @@ import json
 import sys
 import time
 
+sys.path.insert(0, __import__("os").path.dirname(__import__("os").path.dirname(__import__("os").path.abspath(__file__))))
 from playwright.sync_api import sync_playwright
 
 from monitor.scraper import JS_TABLAS, _n
