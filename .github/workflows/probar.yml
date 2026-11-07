@@ -114,5 +114,5 @@ jobs:
           python-version: "3.12"
       - run: pip install -r requirements.txt
       - run: python -m playwright install --with-deps chromium
-      - name: Diagnóstico de detalle
-        run: python tools/diag_detalle.py "${{ github.event.inputs.diag_url }}"
+      - name: Lectura real de partidas (3 veces, debe dar 19 en el procedimiento de prueba)
+        run: python tools/diag_leer.py "${{ github.event.inputs.diag_url }}" 19
