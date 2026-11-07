@@ -250,12 +250,32 @@ class Portal:
         self._opciones_dropdown("contratacion")  # espera a que carguen las opciones dependientes de la ley
         self._elegir_dropdown("contratacion", re.compile(rf"^\s*{re.escape(tipo)}\s*$", re.I))
         self._elegir_claves(claves)
-        self._escribir_fecha(self.page.locator("input[name='fechaDesdeP']").first, desde)
-        self._escribir_fecha(self.page.locator("input[name='fechaHastaP']").first, hasta)
+        self._fijar_fecha("fechaDesdeP", desde)
+        self._fijar_fecha("fechaHastaP", hasta)
         self._pulsar_buscar()
         time.sleep(2.5)
         total = re.search(r"Total:\s*(\d+)", self.page.inner_text("body"))
-        return total.group(1) if total else "?"
+        total = total.group(1) if total else "?"
+        if total.isdigit() and int(total) > self.cfg.max_resultados:
+            self._captura("filtro_fecha_no_aplicado")
+            raise PortalError(
+                f"El portal reporta {total} procedimientos para {desde}→{hasta} (máximo esperado "
+                f"{self.cfg.max_resultados}): el filtro de fecha no se aplicó. Se cancela para no recorrer ni avisar de más.")
+        return total
+
+    def _fijar_fecha(self, nombre: str, d: date) -> None:
+        """Escribe la fecha y verifica leyendo el campo; reintenta si el calendario no la conservó."""
+        esperado = d.strftime("%d/%m/%Y")
+        loc = self.page.locator(f"input[name='{nombre}']").first
+        leido = ""
+        for intento in range(1, 4):
+            self._escribir_fecha(loc, d)
+            leido = (loc.input_value() or "").strip()
+            if leido == esperado:
+                return
+            log.warning("Fecha %s: se escribió %s pero el campo muestra %r (intento %s/3)", nombre, esperado, leido, intento)
+            time.sleep(1.0)
+        raise PortalError(f"No se pudo fijar {nombre}={esperado}; el campo muestra {leido!r}")
 
     # ---------- resultados ----------
     def _filas(self):
