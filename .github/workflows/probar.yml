@@ -7,12 +7,16 @@ on:
         description: "Enviar mensaje de prueba a Telegram (requiere secrets)"
         type: boolean
         default: false
+      diag_url:
+        description: "URL de detalle de un procedimiento para diagnosticar la lectura de partidas"
+        type: string
+        default: ""
   push:
     branches: [main]
 
 jobs:
   probar:
-    if: ${{ !(github.event_name == 'workflow_dispatch' && github.event.inputs.telegram == 'true') }}
+    if: ${{ !(github.event_name == 'workflow_dispatch' && (github.event.inputs.telegram == 'true' || github.event.inputs.diag_url != '')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
@@ -100,3 +104,17 @@ jobs:
       - run: pip install -r requirements.txt
       - name: Mensaje de prueba a Telegram
         run: python -m monitor.main --probar-telegram
+
+  diag:
+    if: ${{ github.event.inputs.diag_url != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - run: python -m playwright install --with-deps chromium
+      - name: Diagnóstico de detalle
+        run: python tools/diag_detalle.py "${{ github.event.inputs.diag_url }}"
