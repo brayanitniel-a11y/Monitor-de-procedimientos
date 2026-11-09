@@ -15,6 +15,10 @@ on:
         description: "Opcional: fecha final del rango (dd/mm/aaaa); si se omite, solo enviar_fecha"
         type: string
         default: ""
+      en_seco:
+        description: "Con enviar_fecha: buscar y mostrar sin enviar ni guardar nada"
+        type: boolean
+        default: false
       diag_url:
         description: "URL de detalle de un procedimiento para diagnosticar la lectura de partidas"
         type: string
@@ -142,4 +146,4 @@ jobs:
       - run: pip install -r requirements.txt
       - run: python -m playwright install --with-deps chromium
       - name: Revisión real con envío a Telegram
-        run: python -m monitor.main --desde "${{ github.event.inputs.enviar_fecha }}" --hasta "${{ github.event.inputs.enviar_hasta || github.event.inputs.enviar_fecha }}" 2>&1 | grep -E "INFO|ERROR|WARNING"
+        run: python -m monitor.main --desde "${{ github.event.inputs.enviar_fecha }}" --hasta "${{ github.event.inputs.enviar_hasta || github.event.inputs.enviar_fecha }}" ${{ github.event.inputs.en_seco == 'true' && '--dry-run' || '' }} 2>&1 | grep -E "INFO|ERROR|WARNING"
