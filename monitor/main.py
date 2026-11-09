@@ -106,14 +106,14 @@ def ejecutar(args) -> int:
         return _revision(cfg, args)
 
 
-def _consultar_portal(cfg, desde, hasta, estado, intentos: int = 2) -> list[Procedimiento]:
+def _consultar_portal(cfg, desde, hasta, estado, intentos: int = 2, extra: set[str] | None = None) -> list[Procedimiento]:
     """Consulta el portal; si falla (equipo ocupado con el otro bot, portal lento), espera y reintenta una vez
     antes de dar por fallida la revisión."""
     from .scraper import Portal
     for n in range(1, intentos + 1):
         try:
             with Portal(cfg) as portal:
-                return _fusionar(portal.buscar_todo(cfg.claves, desde, hasta, set(estado.procedimientos)))
+                return _fusionar(portal.buscar_todo(cfg.claves, desde, hasta, set(estado.procedimientos) | (extra or set())))
         except Exception as e:
             if n == intentos:
                 raise
@@ -133,14 +133,16 @@ def _revision(cfg, args) -> int:
         hasta = _fecha_arg(args.hasta) if args.hasta else desde
     log.info("Revisión %s · publicados del %s al %s · claves %s", etiqueta, desde, hasta, ",".join(cfg.claves))
 
+    # Procedimientos que ya se avisaron por otro medio (p. ej. pruebas previas): se ignoran sin abrirlos ni registrarlos
+    extra = {Estado.clave(x) for x in (args.conocidos or "").split(",") if x.strip()}
     enviar_real = not (args.dry_run or cfg.demo)
     try:
         if cfg.demo:
             candidatos = _fusionar(_cargar_demo())
             nuevos = [p for p in candidatos if not estado.tiene(p.numero)]
         else:
-            candidatos = _consultar_portal(cfg, desde, hasta, estado)
-            nuevos = [p for p in candidatos if not estado.tiene(p.numero)]
+            candidatos = _consultar_portal(cfg, desde, hasta, estado, extra=extra)
+            nuevos = [p for p in candidatos if not estado.tiene(p.numero) and Estado.clave(p.numero) not in extra]
     except Exception as e:
         log.exception("La revisión falló")
         if enviar_real and estado.puede_alertar(ahora):
@@ -208,6 +210,7 @@ def main() -> None:
     ap.add_argument("--descubrir", action="store_true", help="guarda captura y campos del portal")
     ap.add_argument("--probar-telegram", action="store_true", help="envía un mensaje de prueba al grupo")
     ap.add_argument("--adjunto", help="con --probar-telegram: archivo a enviar como prueba")
+    ap.add_argument("--conocidos", help="números de procedimiento ya avisados, separados por coma; se ignoran")
     ap.add_argument("--desde", help="fecha inicial dd/mm/aaaa (rango manual)")
     ap.add_argument("--hasta", help="fecha final dd/mm/aaaa")
     sys.exit(ejecutar(ap.parse_args()))
