@@ -67,3 +67,19 @@ with Portal(cfg, debug_dir=None) as portal:
         print("TOTAL:", re.search(r"Total:\s*(\d+)", portal.page.inner_text("body")), flush=True)
     except Exception as e:
         print("falló buscar:", str(e)[:200], flush=True)
+
+    # ---- detalle del primer proyecto ----
+    try:
+        pg = portal.page
+        pg.locator("table tbody tr").nth(0).locator("td").nth(1).click()
+        pg.wait_for_url(re.compile(r"/detalle/"), timeout=15000)
+        pg.wait_for_load_state("networkidle")
+        time.sleep(6)
+        print("\nURL DETALLE:", pg.url, flush=True)
+        print("TEXTO DETALLE:\n", pg.inner_text("body")[:3500], flush=True)
+        for i, tb in enumerate(pg.evaluate(JS_TABLAS)[:8]):
+            print(f"--- tabla[{i}] headers={tb['headers']} filas={len(tb['rows'])}", flush=True)
+            for f in tb["rows"][:3]:
+                print("      ", " | ".join(x[:50] for x in f["cells"][:10]), flush=True)
+    except Exception as e:
+        print("falló detalle:", str(e)[:300], flush=True)
