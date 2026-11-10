@@ -1,0 +1,18 @@
+[Unit]
+Description=Monitor de compras: atiende comandos de Telegram (/revisar_partidas, /excel_partidas, /estado_partidas)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=@USUARIO@
+WorkingDirectory=@DIR@
+ExecStart=@DIR@/.venv/bin/python -m monitor.escucha
+Restart=always
+RestartSec=15
+# Una revisión manual corre como proceso hijo de este servicio: mismos límites que la revisión programada
+Nice=10
+MemoryMax=1500M
+
+[Install]
+WantedBy=multi-user.target

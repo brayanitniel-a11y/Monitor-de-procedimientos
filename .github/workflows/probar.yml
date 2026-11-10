@@ -19,6 +19,10 @@ on:
         description: "Con enviar_fecha: números de procedimiento ya avisados (coma) para no repetirlos"
         type: string
         default: ""
+      manual:
+        description: "Con enviar_fecha: simula /revisar_partidas (responde aunque no haya nada nuevo)"
+        type: boolean
+        default: false
       en_seco:
         description: "Con enviar_fecha: buscar y mostrar sin enviar ni guardar nada"
         type: boolean
@@ -150,4 +154,4 @@ jobs:
       - run: pip install -r requirements.txt
       - run: python -m playwright install --with-deps chromium
       - name: Revisión real con envío a Telegram
-        run: python -m monitor.main --desde "${{ github.event.inputs.enviar_fecha }}" --hasta "${{ github.event.inputs.enviar_hasta || github.event.inputs.enviar_fecha }}" ${{ github.event.inputs.en_seco == 'true' && '--dry-run' || '' }} --conocidos "${{ github.event.inputs.conocidos }}" 2>&1 | grep -E "INFO|ERROR|WARNING"
+        run: python -m monitor.main --desde "${{ github.event.inputs.enviar_fecha }}" --hasta "${{ github.event.inputs.enviar_hasta || github.event.inputs.enviar_fecha }}" ${{ github.event.inputs.en_seco == 'true' && '--dry-run' || '' }} ${{ github.event.inputs.manual == 'true' && '--manual' || '' }} --conocidos "${{ github.event.inputs.conocidos }}" 2>&1 | grep -E "INFO|ERROR|WARNING"

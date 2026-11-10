@@ -10,11 +10,34 @@ import urllib.request
 log = logging.getLogger("monitor")
 
 
+def _base() -> str:
+    import os
+    return os.getenv("TELEGRAM_API_BASE", "https://api.telegram.org").rstrip("/")
+
+
+class ConflictoDeLectura(RuntimeError):
+    """Otro programa está leyendo los mensajes de este mismo bot (409 de Telegram)."""
+
+
+def llamar(token: str, metodo: str, datos: dict | None = None, timeout: int = 30) -> dict:
+    """Llamada genérica a la API de Telegram (getMe, getUpdates, setMyCommands...)."""
+    req = urllib.request.Request(
+        f"{_base()}/bot{token}/{metodo}", data=json.dumps(datos or {}).encode("utf-8"),
+        headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return json.loads(r.read())
+    except urllib.error.HTTPError as e:
+        if e.code == 409:
+            raise ConflictoDeLectura(e.read().decode("utf-8", "ignore")[:200]) from e
+        raise
+
+
 def enviar(token: str, chat_id: str, texto: str, reintentos: int = 3) -> bool:
     if not token or not chat_id:
         log.error("Falta TELEGRAM_BOT_TOKEN o TELEGRAM_CHAT_ID en .env")
         return False
-    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    url = f"{_base()}/bot{token}/sendMessage"
     cuerpo = json.dumps({
         "chat_id": chat_id, "text": texto, "parse_mode": "HTML", "disable_web_page_preview": True,
     }).encode("utf-8")
@@ -64,7 +87,7 @@ def enviar_documento(token: str, chat_id: str, ruta, caption: str = "", reintent
     partes.append(ruta.read_bytes())
     partes.append(f"\r\n--{limite}--\r\n".encode("utf-8"))
     cuerpo = b"".join(partes)
-    url = f"https://api.telegram.org/bot{token}/sendDocument"
+    url = f"{_base()}/bot{token}/sendDocument"
     for intento in range(1, reintentos + 1):
         req = urllib.request.Request(url, data=cuerpo, headers={"Content-Type": f"multipart/form-data; boundary={limite}"})
         try:

@@ -82,6 +82,25 @@ El instalador (se puede repetir sin problema): crea el entorno, instala Chromium
 Para copiar el historial completo (con precios) al servidor, déjalo en `data/historial/` con su nombre original; si no está,
 se usa la copia sin precios que viene en el repo.
 
+## Comandos de Telegram (revisión manual)
+
+El bot sigue siendo de **envío**: no lee las conversaciones del grupo. Con la privacidad de grupos activada (déjala así),
+Telegram solo le entrega los comandos dirigidos a él. Hay tres, con nombres propios para no cruzarse con otros bots del grupo:
+
+| Comando | Qué hace |
+|---|---|
+| `/revisar_partidas` | Revisión manual ahora, además de las programadas. Responde aunque no haya nada nuevo. |
+| `/excel_partidas` | Envía el Excel actualizado. |
+| `/estado_partidas` | Última revisión correcta, total registrado y si hay una revisión en curso. |
+
+- Escribe el comando desde el menú `/` del grupo (Telegram le agrega `@NombreDelBot`). Si escribes `/revisar_partidas` a mano,
+  con otros bots en el grupo conviene añadir `@NombreDelBot`; si no, Telegram puede no entregárselo.
+- Solo atiende mensajes del grupo configurado en `TELEGRAM_CHAT_ID`; ignora cualquier otro chat y los comandos con más de 2 minutos.
+- No se empalma con las programadas: si ya hay una revisión corriendo, responde que está en curso.
+- Lo ejecuta el servicio `monitor-compras-escucha` (lo instala `instalar_linux.sh`): una sola petición larga cada ~50 s, consumo mínimo.
+- Los avisos de procedimientos nuevos y el Excel salen igual que en una revisión programada; no repite lo ya avisado.
+- Si el registro dice "otro programa está leyendo los mensajes de este bot", el token está compartido con otro proyecto: usa uno distinto.
+
 ## Programación
 
 (Si prefieres cron en lugar de systemd, usa estas líneas; `instalar_linux.sh` ya hace lo equivalente con systemd.)

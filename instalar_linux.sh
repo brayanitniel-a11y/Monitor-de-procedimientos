@@ -54,15 +54,17 @@ else
   echo "Ya hay estado guardado; se omite."
 fi
 
-echo "== 6/6 Programación con systemd (hora CDMX, sin importar la zona del servidor)"
+echo "== 6/6 Programación con systemd (hora CDMX) y servicio de comandos de Telegram"
 TMP="$(mktemp -d)"
 sed "s|@USUARIO@|$USUARIO|g; s|@DIR@|$DIR|g" deploy/monitor-compras.service.in > "$TMP/monitor-compras.service"
 sudo install -m 644 "$TMP/monitor-compras.service" /etc/systemd/system/monitor-compras.service
 sudo install -m 644 deploy/monitor-compras-semana.timer /etc/systemd/system/monitor-compras-semana.timer
 sudo install -m 644 deploy/monitor-compras-finde.timer /etc/systemd/system/monitor-compras-finde.timer
+sed "s|@USUARIO@|$USUARIO|g; s|@DIR@|$DIR|g" deploy/monitor-compras-escucha.service.in > "$TMP/monitor-compras-escucha.service"
+sudo install -m 644 "$TMP/monitor-compras-escucha.service" /etc/systemd/system/monitor-compras-escucha.service
 rm -rf "$TMP"
 sudo systemctl daemon-reload
-sudo systemctl enable --now monitor-compras-semana.timer monitor-compras-finde.timer
+sudo systemctl enable --now monitor-compras-semana.timer monitor-compras-finde.timer monitor-compras-escucha.service
 
 echo
 echo "Listo. Próximas ejecuciones:"
@@ -72,7 +74,8 @@ cat <<TXT
 Comandos útiles:
   journalctl -u monitor-compras -n 50 --no-pager     # ver la última revisión
   tail -f $DIR/data/logs/monitor.log                 # registro del monitor
-  sudo systemctl start monitor-compras               # forzar una revisión ahora
-  sudo systemctl disable --now monitor-compras-semana.timer monitor-compras-finde.timer   # pausar
+  sudo systemctl start monitor-compras               # forzar una revisión ahora (o /revisar_partidas en el grupo)
+  journalctl -u monitor-compras-escucha -n 30 --no-pager   # servicio de comandos de Telegram
+  sudo systemctl disable --now monitor-compras-semana.timer monitor-compras-finde.timer monitor-compras-escucha.service   # pausar
 El Excel está en: $DIR/data/Registro_oportunidades.xlsx
 TXT

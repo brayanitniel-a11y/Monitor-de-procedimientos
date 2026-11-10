@@ -29,10 +29,10 @@ log = logging.getLogger("monitor")
 DEMO_JSON = Path(__file__).resolve().parent.parent / "tests" / "demo_procedimientos.json"
 
 
-def _configurar_log(data_dir: Path) -> None:
+def _configurar_log(data_dir: Path, archivo: str = "monitor.log") -> None:
     (data_dir / "logs").mkdir(parents=True, exist_ok=True)
     fmt = logging.Formatter("%(asctime)s %(levelname)s %(message)s")
-    fh = logging.handlers.RotatingFileHandler(data_dir / "logs" / "monitor.log", maxBytes=1_000_000, backupCount=5, encoding="utf-8")
+    fh = logging.handlers.RotatingFileHandler(data_dir / "logs" / archivo, maxBytes=1_000_000, backupCount=5, encoding="utf-8")
     fh.setFormatter(fmt)
     sh = logging.StreamHandler()
     sh.setFormatter(fmt)
@@ -146,7 +146,7 @@ def _revision(cfg, args) -> int:
             nuevos = [p for p in candidatos if not estado.tiene(p.numero) and Estado.clave(p.numero) not in extra]
     except Exception as e:
         log.exception("La revisión falló")
-        if enviar_real and estado.puede_alertar(ahora):
+        if enviar_real and (args.manual or estado.puede_alertar(ahora)):
             if telegram.enviar(cfg.token, cfg.chat_id, mensajes.alerta_error(etiqueta, f"{type(e).__name__}: {e}")):
                 estado.ultima_alerta = ahora.isoformat(timespec="seconds")
                 estado.guardar()
@@ -197,6 +197,10 @@ def _revision(cfg, args) -> int:
         log.warning("El Excel está abierto; se completará en la próxima revisión")
         return 0
     # Al final de una revisión con novedades se manda el Excel al grupo (una sola vez, sin spam si no hubo nada nuevo)
+    if args.manual and not nuevos and enviar_real:
+        telegram.enviar(cfg.token, cfg.chat_id,
+                        f"✅ <b>Revisión manual {etiqueta}</b>: sin procedimientos nuevos "
+                        f"(publicados del {desde:%d/%m/%Y} al {hasta:%d/%m/%Y}).")
     if agregadas and not cfg.demo and not args.registrar_sin_avisar:
         pie = f"📎 <b>Registro de oportunidades</b> actualizado: {agregadas} procedimiento(s) nuevo(s) en la revisión de las {etiqueta}."
         if telegram.enviar_documento(cfg.token, cfg.chat_id, cfg.excel, pie):
@@ -215,6 +219,7 @@ def main() -> None:
     ap.add_argument("--adjunto", help="con --probar-telegram: archivo a enviar como prueba")
     ap.add_argument("--registrar-sin-avisar", action="store_true",
                     help="guarda lo encontrado como ya avisado, sin enviar nada (primera puesta en marcha)")
+    ap.add_argument("--manual", action="store_true", help="revisión pedida desde Telegram: siempre responde")
     ap.add_argument("--conocidos", help="números de procedimiento ya avisados, separados por coma; se ignoran")
     ap.add_argument("--desde", help="fecha inicial dd/mm/aaaa (rango manual)")
     ap.add_argument("--hasta", help="fecha final dd/mm/aaaa")
