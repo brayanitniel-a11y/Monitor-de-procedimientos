@@ -1,71 +1,69 @@
-"""Explora el menu 'Procesos' del portal y la seccion 'Proyectos de Convocatoria' (solo lectura)."""
+"""Explora el filtro 'Proceso' del portal (Procedimiento de contratación / Proyecto de convocatoria). Solo lectura."""
 import json
 import os
 import re
 import sys
 import time
+from datetime import date, timedelta
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from playwright.sync_api import sync_playwright  # noqa: E402
-
 from monitor import settings  # noqa: E402
-from monitor.scraper import JS_TABLAS  # noqa: E402
+from monitor.scraper import JS_TABLAS, Portal  # noqa: E402
 
 JS_PAGINA = """() => {
   const vis = e => !!(e.offsetWidth || e.offsetHeight);
   const t = e => (e.innerText || '').replace(/\\s+/g, ' ').trim();
   return {
     url: location.href,
-    titulo: document.title,
-    menu: Array.from(document.querySelectorAll('nav a, nav button, nav li, aside a, aside li, header a, header button, [role=menuitem], .p-menuitem-link, .p-menubar li, .p-panelmenu-header, .p-tabview-nav li, [role=tab]'))
-            .filter(vis).map(t).filter(x => x && x.length < 70).slice(0, 80),
     dropdowns: Array.from(document.querySelectorAll('p-dropdown, p-multiselect, p-calendar, p-autocomplete')).map(e => ({tag: e.tagName, name: e.getAttribute('name') || e.getAttribute('formcontrolname') || '', visible: vis(e)})),
-    inputs: Array.from(document.querySelectorAll('input, textarea')).map(e => ({name: e.name || '', id: e.id, ph: e.placeholder || '', visible: vis(e)})),
-    etiquetas: Array.from(document.querySelectorAll('label, mat-label, legend, .p-float-label span')).filter(vis).map(t).filter(Boolean).slice(0, 60),
+    inputs: Array.from(document.querySelectorAll('input')).map(e => ({name: e.name || '', ph: e.placeholder || '', visible: vis(e)})).filter(x => x.visible),
+    etiquetas: Array.from(document.querySelectorAll('label, legend, .p-float-label span')).filter(vis).map(t).filter(Boolean).slice(0, 60),
     botones: Array.from(document.querySelectorAll('button, [role=button]')).filter(vis).map(t).filter(Boolean).slice(0, 40),
-    texto: (document.body.innerText || '').slice(0, 2500),
+    texto: (document.body.innerText || '').slice(0, 1800),
   };
 }"""
 
 
 def volcar(titulo, pg):
     print(f"\n######## {titulo} ########", flush=True)
-    info = pg.evaluate(JS_PAGINA)
-    for k, v in info.items():
-        print(f"--- {k}:", json.dumps(v, ensure_ascii=False)[:2600], flush=True)
+    for k, v in pg.evaluate(JS_PAGINA).items():
+        print(f"--- {k}:", json.dumps(v, ensure_ascii=False)[:2200], flush=True)
     for i, tb in enumerate(pg.evaluate(JS_TABLAS)[:4]):
         print(f"--- tabla[{i}] headers={tb['headers']} filas={len(tb['rows'])}", flush=True)
-        for f in tb["rows"][:2]:
-            print("      ", " | ".join(x[:40] for x in f["cells"][:9]), "| href=", f["href"][:90], flush=True)
+        for f in tb["rows"][:3]:
+            print("      ", " | ".join(x[:40] for x in f["cells"][:10]), "| href=", f["href"][:90], flush=True)
 
 
 cfg = settings.cargar()
-with sync_playwright() as pw:
-    b = pw.chromium.launch(headless=True)
-    pg = b.new_context(locale="es-MX", viewport={"width": 1500, "height": 1000}).new_page()
-    pg.goto(cfg.url, wait_until="domcontentloaded")
-    pg.wait_for_load_state("networkidle")
-    time.sleep(3)
-    volcar("INICIO", pg)
-    for patron in (r"^\s*Procesos\s*$", r"Procesos"):
-        try:
-            pg.get_by_text(re.compile(patron)).first.click(timeout=6000)
-            time.sleep(2)
-            break
-        except Exception as e:
-            print("no pude abrir 'Procesos' con", patron, "->", str(e)[:100])
-    volcar("TRAS ABRIR 'PROCESOS'", pg)
+cfg.headless = True
+hoy = date.today()
+with Portal(cfg, debug_dir=None) as portal:
+    portal._abrir_filtros()
+    opciones = portal._opciones_dropdown("proceso")
+    print("OPCIONES de 'proceso':", opciones, flush=True)
+    portal._elegir_dropdown("proceso", re.compile("convocatoria", re.I))
+    volcar("PROYECTO DE CONVOCATORIA · tras elegir", portal.page)
+    for etapa in ("ley", "contratacion", "claves", "fechaDesdeP"):
+        n = portal.page.locator(f"[name='{etapa}']").count()
+        print(f"campo {etapa}: {n}", flush=True)
     try:
-        pg.get_by_text(re.compile(r"Proyectos? de Convocatoria", re.I)).first.click(timeout=8000)
-        pg.wait_for_load_state("networkidle")
-        time.sleep(3)
-        volcar("PROYECTOS DE CONVOCATORIA", pg)
-        try:
-            pg.get_by_text(re.compile(r"^\s*Filtros\s*$")).first.click(timeout=5000)
-            time.sleep(2)
-            volcar("PROYECTOS DE CONVOCATORIA · FILTROS ABIERTOS", pg)
-        except Exception as e:
-            print("sin boton Filtros:", str(e)[:100])
+        portal._elegir_dropdown("ley", portal.LEY)
+        print("tipos:", portal._opciones_dropdown("contratacion"), flush=True)
     except Exception as e:
-        print("No encontre 'Proyectos de Convocatoria':", str(e)[:200])
-    b.close()
+        print("ley/contratacion no disponibles:", str(e)[:150], flush=True)
+    for paso, f in (("claves", lambda: portal._elegir_claves(cfg.claves)),
+                    ("desde", lambda: portal._fijar_fecha("fechaDesdeP", hoy - timedelta(days=30))),
+                    ("hasta", lambda: portal._fijar_fecha("fechaHastaP", hoy))):
+        try:
+            f()
+            print("ok", paso, flush=True)
+        except Exception as e:
+            print("falló", paso, str(e)[:150], flush=True)
+    volcar("ANTES DE BUSCAR", portal.page)
+    try:
+        portal._pulsar_buscar()
+        time.sleep(3)
+        volcar("RESULTADOS PROYECTOS (30 días)", portal.page)
+        print("TOTAL:", re.search(r"Total:\s*(\d+)", portal.page.inner_text("body")), flush=True)
+    except Exception as e:
+        print("falló buscar:", str(e)[:200], flush=True)
