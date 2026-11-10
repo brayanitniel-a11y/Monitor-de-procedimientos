@@ -436,6 +436,13 @@ class Portal:
 
     def _leer_proyecto(self, proc: Procedimiento) -> None:
         """Detalle de un proyecto de convocatoria: sin renglones; se compara su nombre/descripción."""
+        texto = ""
+        for _ in range(20):  # el detalle del proyecto carga por partes: se espera a que aparezca el cronograma
+            texto = self.page.inner_text("body")
+            if _fecha_cerca(texto, r"fecha y hora de publicaci[oó]n") and _valor_tras(texto, r"nombre del proyecto de convocatoria"):
+                break
+            time.sleep(1.0)
+        time.sleep(1.0)
         texto = self.page.inner_text("body")
         proc.f_publicacion = _fecha_cerca(texto, r"fecha y hora de publicaci[oó]n") or proc.f_publicacion
         proc.f_comentarios = _fecha_cerca(texto, r"l[ií]mite para recepci[oó]n de comentarios")
