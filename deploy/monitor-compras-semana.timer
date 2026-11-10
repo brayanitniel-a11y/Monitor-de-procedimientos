@@ -1,0 +1,15 @@
+[Unit]
+Description=Monitor de compras: lunes a viernes 8:00, 13:00, 18:00 y 21:00 (CDMX)
+
+[Timer]
+OnCalendar=Mon..Fri 08:00:00 America/Mexico_City
+OnCalendar=Mon..Fri 13:00:00 America/Mexico_City
+OnCalendar=Mon..Fri 18:00:00 America/Mexico_City
+OnCalendar=Mon..Fri 21:00:00 America/Mexico_City
+Unit=monitor-compras.service
+# Si el servidor estuvo apagado a esa hora, corre al encender (la ventana de fechas recupera lo perdido)
+Persistent=true
+AccuracySec=10s
+
+[Install]
+WantedBy=timers.target

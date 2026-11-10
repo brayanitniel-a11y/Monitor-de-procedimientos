@@ -1,0 +1,15 @@
+[Unit]
+Description=Monitor de procedimientos ComprasMX (claves de partida)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=@USUARIO@
+WorkingDirectory=@DIR@
+ExecStart=@DIR@/.venv/bin/python -m monitor.main
+# Prioridad baja y tope de memoria: conviven con el otro bot sin quitarle recursos
+Nice=10
+IOSchedulingClass=idle
+MemoryMax=1500M
+TimeoutStartSec=30min

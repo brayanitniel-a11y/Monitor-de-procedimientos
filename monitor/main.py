@@ -1,6 +1,7 @@
 """Punto de entrada. Uso:
 
   python -m monitor.main                 # revision normal (la que programas 4 veces al dia)
+  python -m monitor.main --registrar-sin-avisar --desde 06/11/2026   # primera vez: registra sin avisar
   python -m monitor.main --dry-run       # busca y muestra mensajes, sin enviar ni guardar nada
   python -m monitor.main --demo          # prueba con datos de ejemplo (sin portal ni Telegram)
   python -m monitor.main --probar-telegram  # mensaje de prueba al grupo
@@ -163,6 +164,8 @@ def _revision(cfg, args) -> int:
         return 0
 
     for p in nuevos:
+        if args.registrar_sin_avisar:
+            p.notificado = True  # se guarda en el estado y el Excel, pero no se envía nada a Telegram
         estado.agregar(p)
     estado.ultimo_ok = ahora.date()
     estado.guardar()  # primero guardar: si Telegram o Excel fallan, no se pierde ni se repite nada
@@ -194,7 +197,7 @@ def _revision(cfg, args) -> int:
         log.warning("El Excel está abierto; se completará en la próxima revisión")
         return 0
     # Al final de una revisión con novedades se manda el Excel al grupo (una sola vez, sin spam si no hubo nada nuevo)
-    if agregadas and not cfg.demo:
+    if agregadas and not cfg.demo and not args.registrar_sin_avisar:
         pie = f"📎 <b>Registro de oportunidades</b> actualizado: {agregadas} procedimiento(s) nuevo(s) en la revisión de las {etiqueta}."
         if telegram.enviar_documento(cfg.token, cfg.chat_id, cfg.excel, pie):
             log.info("Excel enviado a Telegram")
@@ -210,6 +213,8 @@ def main() -> None:
     ap.add_argument("--descubrir", action="store_true", help="guarda captura y campos del portal")
     ap.add_argument("--probar-telegram", action="store_true", help="envía un mensaje de prueba al grupo")
     ap.add_argument("--adjunto", help="con --probar-telegram: archivo a enviar como prueba")
+    ap.add_argument("--registrar-sin-avisar", action="store_true",
+                    help="guarda lo encontrado como ya avisado, sin enviar nada (primera puesta en marcha)")
     ap.add_argument("--conocidos", help="números de procedimiento ya avisados, separados por coma; se ignoran")
     ap.add_argument("--desde", help="fecha inicial dd/mm/aaaa (rango manual)")
     ap.add_argument("--hasta", help="fecha final dd/mm/aaaa")

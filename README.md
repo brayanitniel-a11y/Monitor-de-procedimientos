@@ -63,7 +63,28 @@ en `monitor/scraper.py`. Con `HEADLESS=0` en `.env` puedes ver el navegador.
 
 Prueba sin portal ni Telegram: `python -m monitor.main --demo` (usa `data_demo/`).
 
+## Instalación en el servidor Linux (recomendada)
+
+```bash
+git clone https://github.com/brayanitniel-a11y/Monitor-de-procedimientos.git ~/Monitor-de-procedimientos
+cd ~/Monitor-de-procedimientos
+bash instalar_linux.sh          # como tu usuario normal; pide sudo solo para systemd y librerías
+```
+
+El instalador (se puede repetir sin problema): crea el entorno, instala Chromium, te pide token e ID del grupo
+(se guardan en `.env` con permisos 600), prueba Telegram, **registra sin avisar** lo publicado en los últimos 4 días
+(para no repetir avisos en el grupo) y deja programados los horarios con **systemd**:
+
+- Lunes a viernes 8:00, 13:00, 18:00 y 21:00 · sábado y domingo 19:30, siempre en hora de CDMX aunque el servidor tenga otra zona.
+- Si el servidor estuvo apagado, corre al encender y la ventana de fechas recupera lo perdido.
+- Baja prioridad (`Nice=10`), tope de memoria (1.5 GB) y sin solaparse consigo mismo. No toca el otro bot ni la zona horaria del equipo.
+
+Para copiar el historial completo (con precios) al servidor, déjalo en `data/historial/` con su nombre original; si no está,
+se usa la copia sin precios que viene en el repo.
+
 ## Programación
+
+(Si prefieres cron en lugar de systemd, usa estas líneas; `instalar_linux.sh` ya hace lo equivalente con systemd.)
 
 | Días | Horas (CDMX) |
 |---|---|

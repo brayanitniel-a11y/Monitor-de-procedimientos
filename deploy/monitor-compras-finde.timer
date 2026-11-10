@@ -1,0 +1,11 @@
+[Unit]
+Description=Monitor de compras: sábado y domingo 19:30 (CDMX)
+
+[Timer]
+OnCalendar=Sat,Sun 19:30:00 America/Mexico_City
+Unit=monitor-compras.service
+Persistent=true
+AccuracySec=10s
+
+[Install]
+WantedBy=timers.target
