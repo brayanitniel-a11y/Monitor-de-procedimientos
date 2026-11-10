@@ -48,8 +48,10 @@ echo "== 4/6 Prueba de Telegram"
 
 echo "== 5/6 Primera vez: registrar lo ya publicado SIN avisar (evita repetir avisos en el grupo)"
 if [ ! -f data/estado.json ]; then
-  DESDE="$(date -d '4 days ago' +%d/%m/%Y)"
-  .venv/bin/python -m monitor.main --registrar-sin-avisar --desde "$DESDE"
+  # Fechas en hora de CDMX aunque el servidor esté en otra zona; rango completo, de hace 4 días hasta hoy
+  DESDE="$(TZ=America/Mexico_City date -d '4 days ago' +%d/%m/%Y)"
+  HASTA="$(TZ=America/Mexico_City date +%d/%m/%Y)"
+  .venv/bin/python -m monitor.main --registrar-sin-avisar --desde "$DESDE" --hasta "$HASTA"
 else
   echo "Ya hay estado guardado; se omite."
 fi

@@ -131,7 +131,7 @@ def _revision(cfg, args) -> int:
     desde, hasta = calcular_ventana(ahora, estado.ultimo_ok, cfg.hora_corte)
     if args.desde:
         desde = _fecha_arg(args.desde)
-        hasta = _fecha_arg(args.hasta) if args.hasta else desde
+        hasta = _fecha_arg(args.hasta) if args.hasta else ahora.date()  # sin --hasta: hasta hoy
     log.info("Revisión %s · publicados del %s al %s · claves %s", etiqueta, desde, hasta, ",".join(cfg.claves))
 
     # Procedimientos que ya se avisaron por otro medio (p. ej. pruebas previas): se ignoran sin abrirlos ni registrarlos
