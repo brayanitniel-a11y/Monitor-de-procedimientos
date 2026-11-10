@@ -197,9 +197,11 @@ def _revision(cfg, args) -> int:
         log.warning("El Excel está abierto; se completará en la próxima revisión")
         return 0
     # Al final de una revisión con novedades se manda el Excel al grupo (una sola vez, sin spam si no hubo nada nuevo)
-    if args.manual and not nuevos and enviar_real:
+    if (args.manual or cfg.avisar_sin_novedades) and not nuevos and not pendientes and enviar_real \
+            and not args.registrar_sin_avisar:
+        tipo = "manual " if args.manual else ""
         telegram.enviar(cfg.token, cfg.chat_id,
-                        f"✅ <b>Revisión manual {etiqueta}</b>: sin procedimientos nuevos "
+                        f"✅ <b>Revisión {tipo}{etiqueta}</b>: sin procedimientos nuevos "
                         f"(publicados del {desde:%d/%m/%Y} al {hasta:%d/%m/%Y}).")
     if agregadas and not cfg.demo and not args.registrar_sin_avisar:
         pie = f"📎 <b>Registro de oportunidades</b> actualizado: {agregadas} procedimiento(s) nuevo(s) en la revisión de las {etiqueta}."

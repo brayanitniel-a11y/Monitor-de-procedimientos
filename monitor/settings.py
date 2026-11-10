@@ -34,6 +34,7 @@ class Config:
     excel: Path
     max_resultados: int = 60
     reintento_seg: int = 90
+    avisar_sin_novedades: bool = True
     demo: bool = False
 
 
@@ -60,5 +61,6 @@ def cargar(demo: bool = False) -> Config:
         excel=data_dir / "Registro_oportunidades.xlsx",
         max_resultados=int(os.getenv("MAX_RESULTADOS", "60")),
         reintento_seg=int(os.getenv("REINTENTO_SEG", "90")),
+        avisar_sin_novedades=os.getenv("AVISAR_SIN_NOVEDADES", "1") != "0",
         demo=demo,
     )

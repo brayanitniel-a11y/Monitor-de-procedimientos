@@ -27,6 +27,10 @@ on:
         description: "Con enviar_fecha: buscar y mostrar sin enviar ni guardar nada"
         type: boolean
         default: false
+      explorar:
+        description: "Explorar el menú Procesos y la sección Proyectos de Convocatoria (solo lectura)"
+        type: boolean
+        default: false
       diag_url:
         description: "URL de detalle de un procedimiento para diagnosticar la lectura de partidas"
         type: string
@@ -36,7 +40,7 @@ on:
 
 jobs:
   probar:
-    if: ${{ !(github.event_name == 'workflow_dispatch' && (github.event.inputs.telegram == 'true' || github.event.inputs.diag_url != '' || github.event.inputs.enviar_fecha != '')) }}
+    if: ${{ !(github.event_name == 'workflow_dispatch' && (github.event.inputs.telegram == 'true' || github.event.inputs.diag_url != '' || github.event.inputs.enviar_fecha != '' || github.event.inputs.explorar == 'true')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
@@ -155,3 +159,17 @@ jobs:
       - run: python -m playwright install --with-deps chromium
       - name: Revisión real con envío a Telegram
         run: python -m monitor.main --desde "${{ github.event.inputs.enviar_fecha }}" --hasta "${{ github.event.inputs.enviar_hasta || github.event.inputs.enviar_fecha }}" ${{ github.event.inputs.en_seco == 'true' && '--dry-run' || '' }} ${{ github.event.inputs.manual == 'true' && '--manual' || '' }} --conocidos "${{ github.event.inputs.conocidos }}" 2>&1 | grep -E "INFO|ERROR|WARNING"
+
+  explorar:
+    if: ${{ github.event.inputs.explorar == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - run: python -m playwright install --with-deps chromium
+      - name: Explorar Proyectos de Convocatoria
+        run: python tools/explorar_proyectos.py
