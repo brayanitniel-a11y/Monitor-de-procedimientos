@@ -22,6 +22,7 @@ log = logging.getLogger("monitor")
 ETIQUETA_CLAVE = "Clave - Descripción de partida específica"
 ETIQUETA_FECHA = "Fecha de publicación"
 MAX_PAGINAS = 30
+PASADAS = max(1, int(os.getenv("PASADAS_BUSQUEDA", "2")))
 ORIGEN_PROYECTO = "PROYECTO DE CONVOCATORIA"
 
 # Encabezados de la tabla de resultados -> campo (se compara sin acentos, en minusculas)
@@ -348,7 +349,9 @@ class Portal:
             self._captura("sin_tipos")
             raise PortalError("No aparecieron tipos de contratación tras elegir la ley")
         resultados: dict[str, Procedimiento] = {}
-        for tipo in tipos:
+        # El portal a veces devuelve resultados distintos para la misma consulta (visto en pruebas reales):
+        # se hacen PASADAS búsquedas por tipo y se unen; los ya vistos no se vuelven a abrir.
+        for tipo in [t for _ in range(PASADAS) for t in tipos]:
             total = self._filtrar_y_buscar(tipo, claves, desde, hasta)
             log.info("Tipo '%s': el portal reporta %s procedimiento(s)", tipo, total)
             self._captura(f"resultados_{tipo}")
