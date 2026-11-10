@@ -211,5 +211,39 @@ class Telegram(unittest.TestCase):
         self.assertFalse(telegram.enviar_documento("T", "1", "/no/existe.xlsx"))
 
 
+class Proyectos(unittest.TestCase):
+    def _proy(self):
+        p = Procedimiento(numero="PC-2026-00001941", entidad="IMSS", descripcion="SERVICIO DE DOSIMETRIA",
+                          origen="PROYECTO DE CONVOCATORIA", tipo="LICITACIÓN PÚBLICA",
+                          f_publicacion="2026-11-05T16:03", f_comentarios="2026-11-12T09:00",
+                          detectado="2026-11-06T08:00", partidas=[Partida(numero="1", descripcion="MONITOR DE SIGNOS VITALES")])
+        matcher.evaluar_procedimiento(p, historial.cargar(CSV))
+        return p
+
+    def test_mensaje_identifica_proyecto(self):
+        from monitor import mensajes
+        t = mensajes.formatear(self._proy())
+        self.assertIn("NUEVO PROYECTO DE CONVOCATORIA", t)
+        self.assertIn("Límite para comentarios", t)
+        self.assertNotIn("Junta de aclaraciones", t)
+
+    def test_estado_conserva_origen_y_excel_lo_marca(self):
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            est = Estado(d / "e.json")
+            est.agregar(self._proy())
+            est.guardar()
+            otro = Estado.cargar(d / "e.json")
+            self.assertEqual(otro.procedimientos["PC-2026-00001941"].origen, "PROYECTO DE CONVOCATORIA")
+            registro.sincronizar(otro, d / "r.xlsx")
+            ws = load_workbook(d / "r.xlsx")["Procedimientos"]
+            self.assertIn("PROYECTO DE CONVOCATORIA", ws.cell(row=2, column=5).value)
+
+    def test_valor_tras_etiqueta(self):
+        from monitor.scraper import _valor_tras
+        txt = "Nombre del proyecto de convocatoria:\nSERVICIO X\nDescripción detallada del proyecto de convocatoria:\nSERVICIO X Y"
+        self.assertEqual(_valor_tras(txt, r"nombre del proyecto de convocatoria"), "SERVICIO X")
+
+
 if __name__ == "__main__":
     unittest.main()

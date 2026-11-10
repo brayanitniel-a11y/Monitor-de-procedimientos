@@ -15,16 +15,22 @@ def _e(t: str, n: int = 160) -> str:
 
 
 def formatear(p: Procedimiento) -> str:
-    L = [f"{ICONO[p.nivel]} <b>NUEVO · {_e(p.numero, 80)}</b>"]
+    proyecto = bool(p.origen)
+    titulo = "NUEVO PROYECTO DE CONVOCATORIA" if proyecto else "NUEVO"
+    L = [f"{ICONO[p.nivel]} <b>{titulo} · {_e(p.numero, 80)}</b>"]
     if p.entidad:
         L.append(f"🏛 {_e(p.entidad)}")
     if p.descripcion:
         L.append(f"📝 {_e(p.descripcion, 220)}")
     L.append("")
     L.append(f"📅 Publicación: {fmt_fecha(p.f_publicacion)}")
-    L.append(f"❓ Junta de aclaraciones: {fmt_fecha(p.f_junta)}")
-    L.append(f"📨 Presentación y apertura: <b>{fmt_fecha(p.f_apertura)}</b>")
-    L.append(f"⚖️ Fallo: {fmt_fecha(p.f_fallo)}")
+    if proyecto:
+        L.append(f"💬 Límite para comentarios: <b>{fmt_fecha(p.f_comentarios)}</b>")
+        L.append("ℹ️ Es un proyecto: aún no es el procedimiento; sirve para anticipar y comentar.")
+    else:
+        L.append(f"❓ Junta de aclaraciones: {fmt_fecha(p.f_junta)}")
+        L.append(f"📨 Presentación y apertura: <b>{fmt_fecha(p.f_apertura)}</b>")
+        L.append(f"⚖️ Fallo: {fmt_fecha(p.f_fallo)}")
     if p.claves_filtro:
         L.append(f"🔑 Clave(s): {_e(', '.join(p.claves_filtro))}")
     L.append("")

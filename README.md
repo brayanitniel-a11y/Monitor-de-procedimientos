@@ -14,7 +14,7 @@ Es un repo independiente de `vigilante-comprasmx`.
    - Revisiones de las 13:00, 18:00 y 21:00: solo los publicados **hoy**.
    - Si una revisión anterior falló o el equipo estuvo apagado, el rango se extiende hacia atrás
      (máximo 7 días) para no perder nada.
-2. Busca cada clave en el filtro *"Clave - Descripción de partida específica"* y une los resultados.
+2. Busca, con los mismos filtros (claves y fecha de publicación), en **Procedimiento de contratación** y en **Proyecto de convocatoria**. Busca cada clave en el filtro *"Clave - Descripción de partida específica"* y une los resultados.
 3. Ignora los procedimientos que ya están en `data/estado.json` (por número de procedimiento).
 4. Para los nuevos abre el detalle y lee cronograma (junta de aclaraciones, presentación y apertura, fallo) y partidas.
 5. Compara cada partida con el historial:

@@ -22,6 +22,7 @@ log = logging.getLogger("monitor")
 ETIQUETA_CLAVE = "Clave - Descripción de partida específica"
 ETIQUETA_FECHA = "Fecha de publicación"
 MAX_PAGINAS = 30
+ORIGEN_PROYECTO = "PROYECTO DE CONVOCATORIA"
 
 # Encabezados de la tabla de resultados -> campo (se compara sin acentos, en minusculas)
 ALIAS_LISTA = {
@@ -99,6 +100,7 @@ class Portal:
         self.cfg = cfg
         self.debug_dir = debug_dir or (cfg.data_dir / "descubrir")
         self._pw = self._browser = self.page = None
+        self._proyecto = False  # True mientras se recorre "PROYECTO DE CONVOCATORIA"
 
     def __enter__(self):
         from playwright.sync_api import sync_playwright
@@ -244,6 +246,8 @@ class Portal:
 
     def _filtrar_y_buscar(self, tipo: str, claves: list[str], desde: date, hasta: date) -> str:
         self._abrir_filtros()
+        if self._proyecto:  # por omisión el portal busca "PROCEDIMIENTO DE CONTRATACIÓN"
+            self._elegir_dropdown("proceso", re.compile("convocatoria", re.I))
         self._elegir_dropdown("ley", self.LEY)
         self._opciones_dropdown("contratacion")  # espera a que carguen las opciones dependientes de la ley
         self._elegir_dropdown("contratacion", re.compile(rf"^\s*{re.escape(tipo)}\s*$", re.I))
@@ -321,8 +325,22 @@ class Portal:
     def buscar_todo(self, claves: list[str], desde: date, hasta: date, conocidos: set[str] | None = None) -> list[Procedimiento]:
         """Por cada tipo de contratacion (campo obligatorio) busca las claves con la fecha de publicacion.
         Solo abre el detalle de los procedimientos que no estan en `conocidos`."""
+        """Revisa 'Procedimiento de contratación' y 'Proyecto de convocatoria' con los mismos filtros."""
         conocidos = conocidos or set()
+        resultados: dict[str, Procedimiento] = {}
+        for proyecto in (False, True):
+            self._proyecto = proyecto
+            log.info("=== Proceso: %s ===", "PROYECTO DE CONVOCATORIA" if proyecto else "PROCEDIMIENTO DE CONTRATACIÓN")
+            for proc in self._buscar_proceso(claves, desde, hasta, conocidos):
+                resultados.setdefault(proc.numero, proc)
+        self._proyecto = False
+        log.info("Total encontrados %s→%s: %s", desde, hasta, len(resultados))
+        return list(resultados.values())
+
+    def _buscar_proceso(self, claves: list[str], desde: date, hasta: date, conocidos: set[str]) -> list[Procedimiento]:
         self._abrir_filtros()
+        if self._proyecto:
+            self._elegir_dropdown("proceso", re.compile("convocatoria", re.I))
         self._elegir_dropdown("ley", self.LEY)
         tipos = self._opciones_dropdown("contratacion")
         log.info("Tipos de contratación: %s", tipos)
@@ -347,6 +365,8 @@ class Portal:
                     log.info("  fila %s: %s", k + 1, proc.numero if proc else f"(sin número) {celdas[:3]}")
                     if proc is None or proc.numero in resultados:
                         continue
+                    if self._proyecto:
+                        proc.origen = ORIGEN_PROYECTO
                     resultados[proc.numero] = proc
                     if " ".join(proc.numero.upper().split()) in conocidos:
                         continue
@@ -359,7 +379,7 @@ class Portal:
                 if not self._siguiente_pagina():
                     break
                 pagina += 1
-        log.info("Procedimientos encontrados %s→%s: %s", desde, hasta, len(resultados))
+        log.info("Encontrados %s→%s: %s", desde, hasta, len(resultados))
         return list(resultados.values())
 
     def _celdas(self, k: int, intentos: int = 12) -> list[str]:
@@ -396,6 +416,13 @@ class Portal:
             p.get_by_text("CRONOGRAMA DE EVENTOS").first.wait_for(state="visible", timeout=20000)
         except Exception:
             log.warning("No apareció el cronograma en el detalle de %s", proc.numero)
+        if self._proyecto:  # los proyectos no traen tabla de renglones
+            time.sleep(2.0)
+            proc.url = p.url
+            self._leer_proyecto(proc)
+            log.info("Detalle proyecto %s: publicación=%s comentarios=%s", proc.numero, proc.f_publicacion or "—",
+                     proc.f_comentarios or "—")
+            return
         try:
             p.locator("th, [role=columnheader]").filter(has_text=re.compile(r"^\s*Descripción detallada\s*$")).first.wait_for(
                 state="visible", timeout=25000)
@@ -406,6 +433,29 @@ class Portal:
         self._leer_detalle(proc)
         log.info("Detalle %s: publicación=%s apertura=%s partidas=%s", proc.numero, proc.f_publicacion or "—",
                  proc.f_apertura or "—", len(proc.partidas))
+
+    def _leer_proyecto(self, proc: Procedimiento) -> None:
+        """Detalle de un proyecto de convocatoria: sin renglones; se compara su nombre/descripción."""
+        texto = self.page.inner_text("body")
+        proc.f_publicacion = _fecha_cerca(texto, r"fecha y hora de publicaci[oó]n") or proc.f_publicacion
+        proc.f_comentarios = _fecha_cerca(texto, r"l[ií]mite para recepci[oó]n de comentarios")
+        nombre = _valor_tras(texto, r"nombre del proyecto de convocatoria")
+        detalle = _valor_tras(texto, r"descripci[oó]n detallada del proyecto de convocatoria")
+        textos = [t for t in (nombre, detalle) if t]
+        if len(textos) == 2 and (textos[1].upper() in textos[0].upper() or textos[0].upper() in textos[1].upper()):
+            textos = [max(textos, key=len)]
+        desc = " — ".join(textos)
+        if desc:
+            proc.descripcion = proc.descripcion if len(proc.descripcion) > len(nombre) else (nombre or desc)
+            proc.partidas = [Partida(numero="1", descripcion=desc)]
+        codigos = []
+        for tabla in self.page.evaluate(JS_TABLAS):
+            hs = [_n(h) for h in tabla["headers"]]
+            if hs == ["clave", "descripcion"]:
+                codigos += [f["cells"][0] for f in tabla["rows"] if f["cells"]]
+        if codigos:
+            proc.claves_filtro = sorted(set(codigos))
+        proc.detalle_ok = bool(proc.partidas)
 
     def _firma_renglones(self) -> str:
         """Huella de TODAS las tablas de renglones visibles. Algunos procedimientos traen una tabla
@@ -548,6 +598,20 @@ class Portal:
                 item["error"] = str(e)[:300]
             res[etiqueta] = item
         return res
+
+
+def _valor_tras(texto: str, etiqueta: str) -> str:
+    """Primer renglón no vacío después de la línea que contiene la etiqueta ('Etiqueta:' y valor abajo)."""
+    lineas = [ln.strip() for ln in texto.splitlines()]
+    for i, ln in enumerate(lineas):
+        if re.search(etiqueta, ln, re.I):
+            resto = re.sub(rf".*?{etiqueta}\s*:?", "", ln, flags=re.I).strip()
+            if resto:
+                return resto
+            for sig in lineas[i + 1:i + 4]:
+                if sig:
+                    return sig
+    return ""
 
 
 def _fecha_cerca(texto: str, patron: str) -> str:

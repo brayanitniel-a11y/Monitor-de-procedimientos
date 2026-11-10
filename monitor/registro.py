@@ -94,8 +94,8 @@ def sincronizar(estado: Estado, ruta: Path) -> int:
     for p in nuevos:
         fila = ws.max_row + 1 if ws.max_row > 1 or ws.cell(row=2, column=2).value else 2
         valores = [
-            _dt(p.detectado), p.numero, p.entidad, p.descripcion, p.tipo, p.estatus,
-            _dt(p.f_publicacion), _dt(p.f_junta), _dt(p.f_apertura), _dt(p.f_fallo),
+            _dt(p.detectado), p.numero, p.entidad, p.descripcion, (f"{p.origen} · {p.tipo}" if p.origen else p.tipo), p.estatus,
+            _dt(p.f_publicacion), _dt(p.f_junta), _dt(p.f_comentarios if p.origen else p.f_apertura), _dt(p.f_fallo),
             len(p.partidas), p.nivel, p.porcentaje, _resumen_partidas(p), None, None, "No", None,
         ]
         for i, v in enumerate(valores, 1):

@@ -76,5 +76,7 @@ class Procedimiento:
     nivel: str = "Ninguna"
     porcentaje: int = 0
     detalle_ok: bool = True
+    origen: str = ""          # "" = procedimiento de contratación; "PROYECTO DE CONVOCATORIA"
+    f_comentarios: str = ""   # solo proyectos: fecha límite para recibir comentarios
     detectado: str = ""
     notificado: bool = False
