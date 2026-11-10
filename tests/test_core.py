@@ -12,7 +12,7 @@ from monitor.estado import Estado
 from monitor.models import Partida, Procedimiento, fmt_fecha, parse_fecha
 from monitor.ventana import calcular_ventana
 
-CSV = Path(__file__).resolve().parent.parent / "data" / "historial" / "historial_sin_precios.csv"
+CSV = Path(__file__).resolve().parent.parent / "data" / "historial" / "historial_sin_precios.csv"  # un archivo; también se acepta una carpeta
 TZ = ZoneInfo("America/Mexico_City")
 
 
@@ -96,6 +96,41 @@ class Matcher(unittest.TestCase):
     def test_central_no_es_alta_de_monitor(self):
         r = self.ev("CENTRAL DE MONITOREO PARA MONITORES DE SIGNOS VITALES")
         self.assertIn("CENTRAL", r.similar_desc)  # debe parecerse a la central, no al monitor suelto
+
+
+class HistorialVariosArchivos(unittest.TestCase):
+    ENC = "numero_procedimiento,numero_partida,clave_cucop_o_sai,descripcion_detallada,marca,modelo,anio\n"
+
+    def _carpeta(self, d, archivos):
+        for nombre, filas in archivos.items():
+            (Path(d) / nombre).write_text(self.ENC + "".join(filas), encoding="utf-8")
+
+    def test_suma_archivos_y_no_duplica_renglones_repetidos(self):
+        with tempfile.TemporaryDirectory() as d:
+            self._carpeta(d, {
+                "a_base.csv": ["LA-1,1,531.1,TERMOMETRO INFRARROJO,MARCA X,M1,2025\n"],
+                "b_nuevo.csv": ["LA-1,1,531.1,TERMOMETRO INFRARROJO,MARCA X,M1,2025\n",     # repetido de a_base
+                                "LA-9,3,531.2,BASCULA DIGITAL PEDIATRICA,MARCA Y,M2,2026\n"],
+            })
+            items = {it.descripcion: it for it in historial.cargar(Path(d))}
+            self.assertEqual(set(items), {"TERMOMETRO INFRARROJO", "BASCULA DIGITAL PEDIATRICA"})
+            self.assertEqual(items["TERMOMETRO INFRARROJO"].veces, 1)       # no se contó dos veces
+            self.assertEqual(items["BASCULA DIGITAL PEDIATRICA"].ultimo_anio, "2026")
+
+    def test_archivo_minimo_solo_con_descripcion(self):
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "minimo.csv").write_text("descripcion_detallada\nOXIMETRO DE PULSO\n", encoding="utf-8")
+            it = historial.cargar(Path(d))[0]
+            self.assertFalse(it.dudoso)                                     # sin precio: cuenta como oferta real
+            e = matcher.evaluar_partida(Partida(descripcion="Oximetros de pulso portatiles"), [it])
+            self.assertEqual(e.nivel, "Alta")
+
+    def test_la_copia_sin_precios_va_al_final(self):
+        with tempfile.TemporaryDirectory() as d:
+            for n in ("historial_sin_precios.csv", "z_otro.csv", "a_otro.csv"):
+                (Path(d) / n).write_text("descripcion_detallada\nX\n")
+            self.assertEqual([p.name for p in historial.archivos_historial(Path(d))],
+                             ["a_otro.csv", "z_otro.csv", "historial_sin_precios.csv"])
 
 
 class Registro(unittest.TestCase):

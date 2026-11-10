@@ -38,9 +38,8 @@ class Config:
 
 
 def _historial() -> Path:
-    d = BASE / "data" / "historial"
-    completo = d / "Historico_cotizaciones_2025_2026_preliminar.csv"
-    return completo if completo.exists() else d / "historial_sin_precios.csv"
+    """Carpeta con los historiales: se cargan todos los .csv que haya ahí."""
+    return BASE / "data" / "historial"
 
 
 def cargar(demo: bool = False) -> Config:

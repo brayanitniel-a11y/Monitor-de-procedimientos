@@ -59,40 +59,78 @@ class ItemHistorial:
         return max(self.anios) if self.anios else ""
 
 
-def cargar(ruta: Path) -> list[ItemHistorial]:
+BASE_SIN_PRECIOS = "historial_sin_precios.csv"
+
+
+def archivos_historial(carpeta: Path) -> list[Path]:
+    """Todos los .csv de la carpeta. Si existe el historial completo (con precios) del que se derivó la copia
+    sin precios que viene en el repo, esa copia se carga al final y sus renglones repetidos se ignoran."""
+    todos = sorted(p for p in Path(carpeta).glob("*.csv"))
+    base = [p for p in todos if p.name == BASE_SIN_PRECIOS]
+    return [p for p in todos if p.name != BASE_SIN_PRECIOS] + base
+
+
+def _llave(fila: dict) -> tuple:
+    return tuple(normalizar(fila.get(k) or "") for k in (
+        "numero_procedimiento", "numero_partida", "descripcion_detallada", "marca", "modelo")) + (
+        (fila.get("anio") or "").strip().split(".")[0],)
+
+
+def cargar(origen) -> list[ItemHistorial]:
+    """Carga uno o varios CSV (un archivo, una lista de archivos o una carpeta) y los junta.
+    Un renglón que ya vino en un archivo anterior (mismo procedimiento, partida, descripción, marca, modelo
+    y año) no se cuenta dos veces. Solo es obligatoria la columna `descripcion_detallada`."""
+    if isinstance(origen, (str, Path)):
+        origen = Path(origen)
+        rutas = archivos_historial(origen) if origen.is_dir() else [origen]
+    else:
+        rutas = [Path(r) for r in origen]
     grupos: dict[str, ItemHistorial] = {}
-    with open(ruta, encoding="utf-8-sig", newline="") as f:
-        for fila in csv.DictReader(f):
-            desc = (fila.get("descripcion_detallada") or "").strip()
-            if not desc:
-                continue
-            clave_g = normalizar(desc)
-            it = grupos.get(clave_g)
-            if it is None:
-                it = ItemHistorial(descripcion=desc, toks=tokens(desc), norm=" ".join(tokens(desc)))
-                grupos[clave_g] = it
-            c = (fila.get("clave_cucop_o_sai") or "").strip()
-            if c:
-                it.claves.add(c)
-            mm = f"{fila.get('marca', '').strip()} {fila.get('modelo', '').strip()}".strip()
-            if mm and mm not in it.marcas:
-                it.marcas.append(mm)
-            it.veces += 1
-            anio = (fila.get("anio") or "").strip().split(".")[0]
-            if anio:
-                it.anios.add(anio)
-            proc = (fila.get("numero_procedimiento") or "").strip()
-            if proc and proc not in it.procs:
-                it.procs.append(proc)
-            if "solo_cotizacion" in fila:  # copia sin precios (tools/sanitizar_historial.py)
-                if fila["solo_cotizacion"].strip() == "0":
-                    it.reales += 1
-                continue
-            obs = (fila.get("observaciones") or "").lower()
-            try:
-                precio = float(fila.get("precio_unitario_sin_iva") or 0)
-            except ValueError:
-                precio = 0
-            if precio > 0 and not any(m in obs for m in _MARCAS_DUDOSAS):
-                it.reales += 1
+    vistas: set[tuple] = set()
+    for ruta in rutas:
+        de_este_archivo: set[tuple] = set()
+        with open(ruta, encoding="utf-8-sig", newline="") as f:
+            for fila in csv.DictReader(f):
+                llave = _llave(fila)
+                if llave in vistas:      # ya venía en un archivo anterior
+                    continue
+                de_este_archivo.add(llave)
+                _sumar(grupos, fila)
+        vistas |= de_este_archivo
     return list(grupos.values())
+
+
+def _sumar(grupos: dict[str, ItemHistorial], fila: dict) -> None:
+    desc = (fila.get("descripcion_detallada") or "").strip()
+    if not desc:
+        return
+    clave_g = normalizar(desc)
+    it = grupos.get(clave_g)
+    if it is None:
+        it = ItemHistorial(descripcion=desc, toks=tokens(desc), norm=" ".join(tokens(desc)))
+        grupos[clave_g] = it
+    c = (fila.get("clave_cucop_o_sai") or "").strip()
+    if c:
+        it.claves.add(c)
+    mm = f"{(fila.get('marca') or '').strip()} {(fila.get('modelo') or '').strip()}".strip()
+    if mm and mm not in it.marcas:
+        it.marcas.append(mm)
+    it.veces += 1
+    anio = (fila.get("anio") or "").strip().split(".")[0]
+    if anio:
+        it.anios.add(anio)
+    proc = (fila.get("numero_procedimiento") or "").strip()
+    if proc and proc not in it.procs:
+        it.procs.append(proc)
+    if "solo_cotizacion" in fila:  # copia sin precios (tools/sanitizar_historial.py)
+        if (fila["solo_cotizacion"] or "").strip() == "0":
+            it.reales += 1
+        return
+    obs = (fila.get("observaciones") or "").lower()
+    try:
+        precio = float(fila.get("precio_unitario_sin_iva") or 0)
+    except ValueError:
+        precio = 0
+    # Sin columna de precio (archivo mínimo) no se puede saber: se toma como oferta real
+    if "precio_unitario_sin_iva" not in fila or (precio > 0 and not any(m in obs for m in _MARCAS_DUDOSAS)):
+        it.reales += 1

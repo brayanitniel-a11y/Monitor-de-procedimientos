@@ -157,14 +157,32 @@ Los dos proyectos son independientes y **pueden correr al mismo tiempo**; no hay
 - Lo único compartido es la salida a internet y el portal. Con dos revisiones a la vez el portal ve dos navegadores
   desde la misma IP, igual que dos personas en la misma oficina.
 
-## Historial
+## Historial de partidas ofertadas (agregar más)
 
-`data/historial/Historico_cotizaciones_2025_2026_preliminar.csv` (no versionado). Para actualizarlo, reemplaza el archivo
-con el mismo formato de columnas. Notas sobre el historial:
+Se cargan **todos los `.csv` de `data/historial/`** en cada revisión y se suman. No hay que reiniciar nada ni tocar el original:
+basta con dejar un archivo nuevo en esa carpeta. Un renglón que ya venía en otro archivo (mismo procedimiento, partida, descripción,
+marca, modelo y año) no se cuenta dos veces, así que no pasa nada si el archivo nuevo repite algo.
 
-- Las claves vienen en varios formatos (SAI, CUCOP, cuadro básico). La clave se compara sin puntos ni guiones y
-  aceptando prefijos; la descripción es la comparación principal.
-- Los renglones con precio 0 o marcados como investigación de mercado se señalan como "solo cotización".
+**Formato** (CSV en UTF-8; desde Excel: *Guardar como → CSV UTF-8*). La plantilla está en `tools/plantilla_historial.csv`.
+
+| Columna | ¿Obligatoria? | Para qué sirve |
+|---|---|---|
+| `descripcion_detallada` | **Sí** | Base de la comparación con las partidas nuevas |
+| `clave_cucop_o_sai` | No | Si coincide con la clave de una partida nueva, la coincidencia es Alta |
+| `marca`, `modelo` | No | Se muestran como "marca / modelo ofertado" |
+| `numero_procedimiento`, `numero_partida`, `anio` | No | Se muestran como referencia ("último año", "procedimientos donde se ofertó") |
+| `precio_unitario_sin_iva`, `observaciones` | No | Solo para marcar renglones con precio 0 o de "investigación de mercado" como *solo cotización* |
+
+**Pasos en el servidor**
+1. Actualiza el código una vez: `cd ~/Monitor-de-procedimientos && git pull`.
+2. Copia el archivo a la carpeta. Desde tu computadora (PowerShell, Mac o Linux):
+   `scp historial_2026_nov.csv usuario@IP_DEL_SERVIDOR:~/Monitor-de-procedimientos/data/historial/`
+   Alternativas: WinSCP o FileZilla (conexión SFTP), o `nano ~/Monitor-de-procedimientos/data/historial/historial_2026_nov.csv` y pegar el contenido.
+3. Comprueba que se leyó:
+   `cd ~/Monitor-de-procedimientos && .venv/bin/python -c "from monitor import historial; from pathlib import Path; it=historial.cargar(Path('data/historial')); print(len(it), 'partidas distintas,', sum(i.veces for i in it), 'renglones')"`
+
+Se aplica desde la siguiente revisión. Los procedimientos ya registrados conservan la coincidencia que tenían. Para quitar un archivo, bórralo.
+Los `.csv` que agregues en el servidor **no se suben a GitHub** (están en `.gitignore`), así que los precios se quedan privados.
 
 ## Pruebas
 
