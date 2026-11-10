@@ -30,7 +30,6 @@ COMANDOS = {
     "excel_partidas": "Enviar el Excel de oportunidades",
     "estado_partidas": "Última revisión y total registrado",
 }
-MAX_EDAD_SEG = 120          # un comando más viejo que esto (p. ej. escrito con el servicio caído) se ignora
 LIMITE_REVISION_SEG = 25 * 60
 
 
@@ -51,6 +50,7 @@ class Escucha:
         self.usuario = ""
         self.comando_revision = comando_revision or [sys.executable, "-m", "monitor.main", "--manual"]
         self._hilo: threading.Thread | None = None
+        self._chats_ignorados: set[str] = set()
 
     # ---------- envío ----------
     def _decir(self, texto: str) -> None:
@@ -103,11 +103,28 @@ class Escucha:
                     f"{'🔎 Hay una revisión en curso.' if self._ocupado() else 'Sin revisión en curso.'}")
 
     # ---------- ciclo ----------
+    def _descartar_pendientes(self) -> int | None:
+        """Al arrancar se olvidan los comandos que quedaron en espera mientras el servicio estaba caído, para no
+        ejecutarlos tarde. No depende del reloj del servidor (usa los identificadores de Telegram)."""
+        try:
+            r = telegram.llamar(self.cfg.token, "getUpdates", {"offset": -1, "timeout": 0, "allowed_updates": ["message"]})
+            res = r.get("result") or []
+            if isinstance(res, list) and res:
+                return res[-1]["update_id"] + 1
+        except Exception as e:
+            log.warning("No se pudieron descartar los comandos pendientes: %s", e)
+        return None
+
     def atender(self, update: dict) -> None:
         msg = update.get("message")
-        if not msg or str(msg.get("chat", {}).get("id")) != str(self.cfg.chat_id):
-            return                                    # otro chat (o privado): se ignora
-        if time.time() - msg.get("date", 0) > MAX_EDAD_SEG:
+        if not msg:
+            return
+        chat = str(msg.get("chat", {}).get("id"))
+        if chat != str(self.cfg.chat_id):             # otro chat (o privado): se ignora, pero se deja constancia
+            if chat not in self._chats_ignorados and (msg.get("text") or "").startswith("/"):
+                self._chats_ignorados.add(chat)
+                log.warning("Comando recibido de un chat distinto al configurado (%s ≠ %s); se ignora. "
+                            "Si es el grupo correcto, corrige TELEGRAM_CHAT_ID en .env.", chat, self.cfg.chat_id)
             return
         cmd = comando_de(msg.get("text"), self.usuario)
         if cmd is None:
@@ -128,11 +145,13 @@ class Escucha:
             "commands": [{"command": c, "description": d} for c, d in COMANDOS.items()],
             "scope": {"type": "all_group_chats"}})
         log.info("Escuchando comandos como @%s en el grupo %s", self.usuario, self.cfg.chat_id)
-        offset = None
+        offset = self._descartar_pendientes()
         while True:
             try:
-                r = telegram.llamar(self.cfg.token, "getUpdates",
-                                    {"timeout": 50, "offset": offset, "allowed_updates": ["message"]}, timeout=70)
+                datos = {"timeout": 50, "allowed_updates": ["message"]}
+                if offset is not None:               # Telegram no recibe "offset": null
+                    datos["offset"] = offset
+                r = telegram.llamar(self.cfg.token, "getUpdates", datos, timeout=70)
             except telegram.ConflictoDeLectura as e:
                 log.error("Otro programa está leyendo los mensajes de este bot (¿mismo token que el otro bot?): %s", e)
                 time.sleep(60)
@@ -141,7 +160,8 @@ class Escucha:
                 log.warning("getUpdates falló (%s); reintento en 10 s", e)
                 time.sleep(10)
                 continue
-            for u in r.get("result", []):
+            resultado = r.get("result") or []
+            for u in resultado if isinstance(resultado, list) else []:
                 offset = u["update_id"] + 1
                 try:
                     self.atender(u)

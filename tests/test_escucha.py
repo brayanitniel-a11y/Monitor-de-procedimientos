@@ -77,11 +77,20 @@ class Escucha(unittest.TestCase):
     def tearDown(self):
         self.tmp.cleanup()
 
-    def test_ignora_otro_chat_y_mensajes_viejos(self):
+    def test_ignora_otro_chat_y_comandos_de_otro_bot(self):
         self.e.atender(_upd("/estado_partidas@MiBot", chat="-999"))
-        self.e.atender(_upd("/estado_partidas@MiBot", edad=3600))
         self.e.atender(_upd("/estado_partidas@OtroBot"))
+        self.e.atender(_upd("hola a todos"))
         self.assertEqual(_Falso.llamadas, [])
+
+    def test_no_depende_del_reloj_del_servidor(self):
+        self.e.atender(_upd("/estado_partidas@MiBot", edad=7200))          # fecha "vieja": igual se atiende
+        self.assertEqual(len(_textos()), 1)
+
+    def test_getupdates_nunca_lleva_offset_nulo(self):
+        self.e._descartar_pendientes()
+        cuerpos = [json.loads(c) for r, c in _Falso.llamadas if r.endswith("/getUpdates")]
+        self.assertEqual(cuerpos, [{"offset": -1, "timeout": 0, "allowed_updates": ["message"]}])
 
     def test_estado(self):
         self.e.atender(_upd("/estado_partidas@MiBot"))
