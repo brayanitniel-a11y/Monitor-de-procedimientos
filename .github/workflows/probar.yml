@@ -158,7 +158,7 @@ jobs:
       - run: pip install -r requirements.txt
       - run: python -m playwright install --with-deps chromium
       - name: Revisión real con envío a Telegram
-        run: python -m monitor.main --desde "${{ github.event.inputs.enviar_fecha }}" --hasta "${{ github.event.inputs.enviar_hasta || github.event.inputs.enviar_fecha }}" ${{ github.event.inputs.en_seco == 'true' && '--dry-run' || '' }} ${{ github.event.inputs.manual == 'true' && '--manual' || '' }} --conocidos "${{ github.event.inputs.conocidos }}" 2>&1 | grep -E "INFO|ERROR|WARNING"
+        run: python -m monitor.main --desde "${{ github.event.inputs.enviar_fecha }}" --hasta "${{ github.event.inputs.enviar_hasta || github.event.inputs.enviar_fecha }}" ${{ github.event.inputs.en_seco == 'true' && '--dry-run' || '' }} ${{ github.event.inputs.manual == 'true' && '--manual' || '' }} --conocidos "${{ github.event.inputs.conocidos }}" 2>&1
 
   explorar:
     if: ${{ github.event.inputs.explorar == 'true' }}
