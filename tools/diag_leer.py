@@ -18,6 +18,9 @@ with Portal(cfg) as portal:
         proc = Procedimiento(numero=f"DIAG-{intento}", url=url)
         portal._leer_detalle(proc)
         resultados.append(len(proc.partidas))
+        if intento == 1:
+            from monitor import mensajes
+            print("MENSAJE:\n" + mensajes.formatear(proc), flush=True)
         print(f"Lectura {intento}: {len(proc.partidas)} partidas; claves={proc.claves_filtro}", flush=True)
 print("RESULTADOS:", resultados)
 ok = len(set(resultados)) == 1 and (esperadas is None or resultados[0] == esperadas)
