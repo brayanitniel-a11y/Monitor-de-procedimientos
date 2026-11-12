@@ -14,47 +14,49 @@ def _e(t: str, n: int = 160) -> str:
     return escape(t if len(t) <= n else t[: n - 1] + "…")
 
 
+NIVEL_TXT = {"Alta": "ALTA", "Media": "MEDIA", "Ninguna": "NULA"}
+
+
+def _campo(etiqueta: str, valor: str) -> list[str]:
+    return [f"<b>{etiqueta}</b>", _e(valor, 300) if valor else "—"]
+
+
 def formatear(p: Procedimiento) -> str:
+    """Solo lo que el equipo necesita, con los mismos datos del detalle de ComprasMX.
+    La coincidencia con el historial va al principio."""
     proyecto = bool(p.origen)
-    titulo = "NUEVO PROYECTO DE CONVOCATORIA" if proyecto else "NUEVO"
-    L = [f"{ICONO[p.nivel]} <b>{titulo} · {_e(p.numero, 80)}</b>"]
-    if p.entidad:
-        L.append(f"🏛 {_e(p.entidad)}")
-    if p.descripcion:
-        L.append(f"📝 {_e(p.descripcion, 220)}")
-    L.append("")
-    L.append(f"📅 Publicación: {fmt_fecha(p.f_publicacion)}")
+    pct = f" ({p.porcentaje}%)" if p.nivel != "Ninguna" else ""
+    L = [f"{ICONO[p.nivel]} <b>Coincidencia {NIVEL_TXT[p.nivel]}</b>{pct}"]
     if proyecto:
-        L.append(f"💬 Límite para comentarios: <b>{fmt_fecha(p.f_comentarios)}</b>")
-        L.append("ℹ️ Es un proyecto: aún no es el procedimiento; sirve para anticipar y comentar.")
-    else:
-        L.append(f"❓ Junta de aclaraciones: {fmt_fecha(p.f_junta)}")
-        L.append(f"📨 Presentación y apertura: <b>{fmt_fecha(p.f_apertura)}</b>")
-        L.append(f"⚖️ Fallo: {fmt_fecha(p.f_fallo)}")
-    if p.claves_filtro:
-        L.append(f"🔑 Clave(s): {_e(', '.join(p.claves_filtro))}")
+        L.append("📄 <b>PROYECTO DE CONVOCATORIA</b>")
     L.append("")
-    if p.nivel == "Ninguna":
-        L.append("📚 Historial: sin coincidencia clara con lo que hemos ofertado")
+    L += _campo("Código del expediente:", p.expediente)
+    L += _campo("Código del proyecto de convocatoria:" if proyecto else "Número de procedimiento de contratación:", p.numero)
+    L += _campo("Dependencia o Entidad:", p.entidad_completa or p.entidad)
+    L += _campo("Nombre del proyecto de convocatoria:" if proyecto else "Nombre del procedimiento de contratación:", p.descripcion)
+    L += _campo("Tipo de procedimiento de contratación:", p.tipo)
+    L += _campo("Fecha y hora de publicación:", fmt_fecha(p.f_publicacion) if p.f_publicacion else "")
+    if proyecto:
+        L += _campo("Fecha y hora límite para recepción de comentarios:", fmt_fecha(p.f_comentarios) if p.f_comentarios else "")
     else:
-        L.append(f"📚 Historial: <b>coincidencia {p.nivel.upper()}</b> ({p.porcentaje}%)")
-    con = sorted((x for x in p.partidas if x.nivel != "Ninguna"), key=lambda x: -x.porcentaje)
-    for x in con[:5]:
-        marca = f" · {_e(x.similar_marca_modelo, 60)}" if x.similar_marca_modelo else ""
-        veces = f" · {x.similar_veces}x" if x.similar_veces else ""
-        aviso = " (solo cotización)" if x.similar_dudoso else ""
-        L.append(f"• Partida {_e(x.numero or '-', 10)}: {_e(x.descripcion, 90)}\n   ↳ posible partida de interés: {_e(x.similar_desc, 80)}{marca}{veces}{aviso}")
-    if len(con) > 5:
-        L.append(f"… y {len(con) - 5} partidas más con coincidencia (ver Excel)")
-    sin = len(p.partidas) - len(con)
-    if con and sin > 0:
-        L.append(f"({sin} partida(s) sin coincidencia)")
+        L += _campo("Fecha y hora de presentación y apertura de proposiciones:", fmt_fecha(p.f_apertura) if p.f_apertura else "")
+        L += _campo("Fecha y hora de junta de aclaraciones:", fmt_fecha(p.f_junta) if p.f_junta else "")
+        L += _campo("Fecha y hora límite para envío de aclaraciones a través de Compras MX:",
+                    fmt_fecha(p.f_aclaraciones) if p.f_aclaraciones else "")
+        L += _campo("Fecha y hora del acto del Fallo:", fmt_fecha(p.f_fallo) if p.f_fallo else "")
+    L += _campo("Fecha estimada del inicio del contrato:", fmt_fecha(p.f_inicio_contrato) if p.f_inicio_contrato else "")
+    L += _campo("Criterio de evaluación:", p.criterio)
+    L += _campo("Carácter:", p.caracter)
     if not p.detalle_ok:
         L.append("⚠️ No se pudo leer el detalle completo; revisar en el portal.")
     if p.url:
         L.append(f'🔗 <a href="{escape(p.url, quote=True)}">Abrir en ComprasMX</a>')
     texto = "\n".join(L)
     return texto if len(texto) <= LIMITE else texto[: LIMITE - 1] + "…"
+
+
+def sin_novedad(ahora) -> str:
+    return f"✅ <b>Sin novedad en ComprasMX para EM</b>\n🕒 Revisión: {ahora:%d/%m/%Y %H:%M}"
 
 
 def resumen(etiqueta: str, nuevos: list[Procedimiento]) -> str:

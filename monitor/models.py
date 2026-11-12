@@ -77,6 +77,12 @@ class Procedimiento:
     porcentaje: int = 0
     detalle_ok: bool = True
     origen: str = ""          # "" = procedimiento de contratación; "PROYECTO DE CONVOCATORIA"
+    expediente: str = ""
+    entidad_completa: str = ""
+    f_aclaraciones: str = ""    # límite para enviar aclaraciones por ComprasMX
+    f_inicio_contrato: str = ""
+    criterio: str = ""
+    caracter: str = ""
     f_comentarios: str = ""   # solo proyectos: fecha límite para recibir comentarios
     detectado: str = ""
     notificado: bool = False

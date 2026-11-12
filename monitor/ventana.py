@@ -11,7 +11,8 @@ def calcular_ventana(
     max_dias: int = 7,
 ) -> tuple[date, date]:
     """Regla del equipo:
-    - Primera revision de la manana (antes de hora_corte): procedimientos de AYER.
+    - Primera revision de la manana (antes de hora_corte): de AYER a HOY (el dia anterior completo
+      mas lo publicado en la madrugada).
     - Revisiones del dia y de la tarde/noche: solo el dia en curso.
 
     Si la ultima revision exitosa quedo antes del inicio de la ventana (equipo apagado,
@@ -20,7 +21,7 @@ def calcular_ventana(
     """
     hoy = ahora.date()
     if ahora.hour < hora_corte:
-        desde = hasta = hoy - timedelta(days=1)
+        desde, hasta = hoy - timedelta(days=1), hoy
     else:
         desde = hasta = hoy
     if ultimo_ok is not None and ultimo_ok < desde:

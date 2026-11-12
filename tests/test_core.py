@@ -21,8 +21,8 @@ def hora(h, d=6):
 
 
 class Ventana(unittest.TestCase):
-    def test_manana_busca_ayer(self):
-        self.assertEqual(calcular_ventana(hora(8), date(2026, 11, 5)), (date(2026, 11, 5), date(2026, 11, 5)))
+    def test_manana_busca_ayer_y_hoy(self):
+        self.assertEqual(calcular_ventana(hora(8), date(2026, 11, 5)), (date(2026, 11, 5), date(2026, 11, 6)))
 
     def test_dia_y_noche_solo_hoy(self):
         for h in (13, 18, 21):
@@ -48,11 +48,11 @@ class VentanaFinDeSemana(unittest.TestCase):
 
     def test_lunes_manana_cubre_domingo_noche(self):
         lun = datetime(2026, 11, 9, 8, 0, tzinfo=TZ)
-        self.assertEqual(calcular_ventana(lun, date(2026, 11, 8)), (date(2026, 11, 8), date(2026, 11, 8)))
+        self.assertEqual(calcular_ventana(lun, date(2026, 11, 8)), (date(2026, 11, 8), date(2026, 11, 9)))
 
     def test_fin_de_semana_sin_revisiones_se_recupera(self):
         lun = datetime(2026, 11, 9, 8, 0, tzinfo=TZ)             # el equipo estuvo apagado desde el viernes
-        self.assertEqual(calcular_ventana(lun, date(2026, 11, 6)), (date(2026, 11, 6), date(2026, 11, 8)))
+        self.assertEqual(calcular_ventana(lun, date(2026, 11, 6)), (date(2026, 11, 6), date(2026, 11, 9)))
 
 
 class Fechas(unittest.TestCase):
@@ -175,13 +175,13 @@ class Registro(unittest.TestCase):
 
 
 class Mensajes(unittest.TestCase):
-    def test_texto_posible_partida_de_interes(self):
+    def test_coincidencia_al_inicio_y_sin_detalle_de_partidas(self):
         from monitor import mensajes
         p = Procedimiento(numero="LA-1", partidas=[Partida(numero="1", descripcion="MONITOR DE SIGNOS VITALES")])
         matcher.evaluar_procedimiento(p, historial.cargar(CSV))
         txt = mensajes.formatear(p)
-        self.assertIn("posible partida de interés", txt)
-        self.assertNotIn("ya visto", txt)
+        self.assertTrue(txt.startswith("🟢 <b>Coincidencia ALTA</b>"))
+        self.assertNotIn("Partida 1", txt)
 
 
 class Telegram(unittest.TestCase):
@@ -223,9 +223,28 @@ class Proyectos(unittest.TestCase):
     def test_mensaje_identifica_proyecto(self):
         from monitor import mensajes
         t = mensajes.formatear(self._proy())
-        self.assertIn("NUEVO PROYECTO DE CONVOCATORIA", t)
-        self.assertIn("Límite para comentarios", t)
-        self.assertNotIn("Junta de aclaraciones", t)
+        self.assertIn("PROYECTO DE CONVOCATORIA", t)
+        self.assertIn("límite para recepción de comentarios", t)
+        self.assertNotIn("junta de aclaraciones", t)
+
+    def test_mensaje_procedimiento_formato_pedido(self):
+        from monitor import mensajes
+        p = self._proy()
+        p.origen = ""
+        p.expediente, p.caracter, p.criterio = "E-2026-00121219", "NACIONAL", "BINARIO"
+        p.f_aclaraciones, p.f_fallo = "2026-11-17T10:00", "2026-11-26T13:00"
+        t = mensajes.formatear(p).splitlines()
+        self.assertTrue(t[0].startswith(("🟢", "🟡", "⚪")))      # coincidencia al principio
+        self.assertIn("<b>Código del expediente:</b>", t)
+        self.assertIn("E-2026-00121219", t)
+        self.assertIn("17/11/2026 10:00", t)
+        self.assertNotIn("posible partida", "\n".join(t))
+
+    def test_sin_novedad(self):
+        from monitor import mensajes
+        t = mensajes.sin_novedad(datetime(2026, 11, 12, 9, 40))
+        self.assertIn("Sin novedad en ComprasMX para EM", t)
+        self.assertIn("12/11/2026 09:40", t)
 
     def test_estado_conserva_origen_y_excel_lo_marca(self):
         with tempfile.TemporaryDirectory() as d:

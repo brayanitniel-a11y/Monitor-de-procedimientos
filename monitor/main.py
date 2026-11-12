@@ -173,8 +173,6 @@ def _revision(cfg, args) -> int:
     pendientes = sorted(estado.pendientes(), key=lambda p: p.detectado)
     if pendientes:
         textos = []
-        if len(pendientes) > 1:
-            textos.append((None, mensajes.resumen(etiqueta, pendientes)))
         textos += [(p, mensajes.formatear(p)) for p in pendientes]
         for p, texto in textos:
             if cfg.demo:
@@ -199,10 +197,7 @@ def _revision(cfg, args) -> int:
     # Al final de una revisión con novedades se manda el Excel al grupo (una sola vez, sin spam si no hubo nada nuevo)
     if (args.manual or cfg.avisar_sin_novedades) and not nuevos and not pendientes and enviar_real \
             and not args.registrar_sin_avisar:
-        tipo = "manual " if args.manual else ""
-        telegram.enviar(cfg.token, cfg.chat_id,
-                        f"✅ <b>Revisión {tipo}{etiqueta}</b>: sin procedimientos nuevos "
-                        f"(publicados del {desde:%d/%m/%Y} al {hasta:%d/%m/%Y}).")
+        telegram.enviar(cfg.token, cfg.chat_id, mensajes.sin_novedad(ahora))
     if agregadas and not cfg.demo and not args.registrar_sin_avisar:
         pie = f"📎 <b>Registro de oportunidades</b> actualizado: {agregadas} procedimiento(s) nuevo(s) en la revisión de las {etiqueta}."
         if telegram.enviar_documento(cfg.token, cfg.chat_id, cfg.excel, pie):

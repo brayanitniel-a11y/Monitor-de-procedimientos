@@ -449,6 +449,7 @@ class Portal:
         texto = self.page.inner_text("body")
         proc.f_publicacion = _fecha_cerca(texto, r"fecha y hora de publicaci[oó]n") or proc.f_publicacion
         proc.f_comentarios = _fecha_cerca(texto, r"l[ií]mite para recepci[oó]n de comentarios")
+        self._datos_generales(proc, texto)
         nombre = _valor_tras(texto, r"nombre del proyecto de convocatoria")
         detalle = _valor_tras(texto, r"descripci[oó]n detallada del proyecto de convocatoria")
         textos = [t for t in (nombre, detalle) if t]
@@ -489,8 +490,23 @@ class Portal:
             time.sleep(1.0)
         log.warning("Los renglones no se estabilizaron; se usa la última lectura")
 
+    @staticmethod
+    def _datos_generales(proc: Procedimiento, texto: str) -> None:
+        """Datos que se reportan al equipo (mismos del detalle de ComprasMX)."""
+        proc.expediente = _valor_tras(texto, r"^c[oó]digo del expediente") or proc.expediente
+        proc.entidad_completa = _valor_tras(texto, r"^dependencia o entidad") or proc.entidad_completa
+        nombre = _valor_tras(texto, r"^nombre del (?:procedimiento de contrataci[oó]n|proyecto de convocatoria)")
+        if nombre:
+            proc.descripcion = nombre
+        proc.tipo = _valor_tras(texto, r"^tipo de procedimiento de contrataci[oó]n") or proc.tipo
+        proc.f_aclaraciones = _fecha_cerca(texto, r"l[ií]mite para env[ií]o de aclaraciones") or proc.f_aclaraciones
+        proc.f_inicio_contrato = _fecha_cerca(texto, r"fecha estimada del inicio del contrato") or proc.f_inicio_contrato
+        proc.criterio = _valor_tras(texto, r"^criterio de evaluaci[oó]n") or proc.criterio
+        proc.caracter = _valor_tras(texto, r"^car[aá]cter") or proc.caracter
+
     def _leer_detalle(self, proc: Procedimiento) -> None:
         texto = self.page.inner_text("body")
+        self._datos_generales(proc, texto)
         proc.f_publicacion = _fecha_cerca(texto, r"fecha y hora de publicaci[oó]n") or proc.f_publicacion
         proc.f_junta = _fecha_cerca(texto, r"fecha y hora de junta de aclaraciones") or proc.f_junta
         proc.f_apertura = _fecha_cerca(texto, r"fecha y hora de presentaci[oó]n y apertura") or proc.f_apertura

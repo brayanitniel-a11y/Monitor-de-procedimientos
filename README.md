@@ -10,7 +10,7 @@ Es un repo independiente de `vigilante-comprasmx`.
 ## Qué hace en cada revisión
 
 1. Calcula el rango de fechas de publicación:
-   - Revisión de la mañana (antes de las 10:00): procedimientos publicados **ayer**.
+   - Revisión de la mañana (antes de las 10:00): publicados de **ayer a hoy**.
    - Revisiones de las 13:00, 18:00 y 21:00: solo los publicados **hoy**.
    - Si una revisión anterior falló o el equipo estuvo apagado, el rango se extiende hacia atrás
      (máximo 7 días) para no perder nada.
